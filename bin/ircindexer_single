@@ -1,0 +1,73 @@
+#!perl
+
+use 5.12.1;
+use strict;
+use warnings;
+
+use POE;
+use IRC::Indexer::Trawl::Bot;
+
+use Data::Dumper;
+
+use JSON::XS;
+
+my($server, $verbose);
+my $fmt = 'STDOUT';
+
+use Getopt::Long;
+GetOptions(
+  'help' => sub {
+    
+    exit 0
+  },
+  
+  'server=s' => \$server,
+
+  'verbose:0' => \$verbose,
+  
+  'format|export=s' => \$fmt,
+);
+
+die "Missing --server\n" unless $server;
+
+warn "Connecting to: $server\n";
+
+my $trawl = IRC::Indexer::Trawl::Bot->new(
+  server => $server,
+  verbose => $verbose,
+  timeout => 90,
+);
+
+POE::Session->create(
+  inline_states => {
+    _start => sub {
+      $_[KERNEL]->alarm('check', time + 20);
+    },
+    
+    check => sub {
+      if ($trawl->done) {
+        my $ref = $trawl->dump;
+        warn "Done\n";
+
+        given ($fmt) {
+          print encode_json($ref)."\n" when /JSON/i;
+          default { print Dumper $ref }
+        }
+
+        $_[KERNEL]->stop;
+        exit 0
+      } else {
+        warn "Waiting . . .\n";
+        $_[KERNEL]->alarm('check', time + 20);
+      }
+    },
+  },
+);
+
+POE::Kernel->run;
+
+__END__
+
+=pod
+
+=cut
