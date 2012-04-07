@@ -1,0 +1,9 @@
+bin/single_server
+Build.PL
+lib/IRC/Indexer.pm
+lib/IRC/Indexer/Trawl/Bot.pm
+MANIFEST			This list of files
+Makefile.PL
+README
+META.yml
+META.json

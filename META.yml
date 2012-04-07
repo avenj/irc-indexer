@@ -1,0 +1,29 @@
+---
+abstract: 'IRC network indexing system'
+author:
+  - 'Jon Portnoy <avenj@cobaltirc.org>'
+build_requires:
+  Test::More: 0
+configure_requires:
+  Module::Build: 0.36
+dynamic_config: 1
+generated_by: 'Module::Build version 0.38, CPAN::Meta::Converter version 2.112150'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: IRC-Indexer
+provides:
+  IRC::Indexer:
+    file: lib/IRC/Indexer.pm
+    version: 0.01
+  IRC::Indexer::Trawl::Bot:
+    file: lib/IRC/Indexer/Trawl/Bot.pm
+    version: 0.10
+requires:
+  Getopt::Long: 0
+  POE::Component::IRC::State: 6.74
+  perl: v5.12.1
+resources:
+  license: http://dev.perl.org/licenses/
+version: 0.01

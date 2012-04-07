@@ -53,6 +53,9 @@ sub new {
   my %args = @_;
   $args{lc $_} = delete $args{$_} for keys %args;
 
+  $self->{timeout}   = $args{timeout}  || 120;
+  $self->{interval}  = $args{interval} || 20;
+
   $self->{ircserver} = $args{server} ? $args{server} 
                              : croak "No Server specified in new" ;
   $self->{ircport} = $args{port} ? $args{port} : 6667 ;
@@ -68,6 +71,7 @@ sub new {
          
          _check_timeout
          _retrieve_info
+         _issue_cmd
          
          irc_connected
          irc_001
@@ -139,8 +143,6 @@ sub channels {
   return $self->netinfo->{ListChans} = $chanlist if $chanlist
     and ref $chanlist eq 'ARRAY' ;
   return $self->netinfo->{ListChans}  
-  ## FIXME diff method to add a single channel
-  ## FIXME array of hashes of chaninfo, sorted by users?
 }
 
 ## Status accessors
@@ -199,37 +201,54 @@ sub _start {
     port     => $self->{ircport},
   );
   $self->{ircobj} = $irc;
-  $irc->yield(register => 'all');  # FIXME?
+  $irc->yield(register => 'all');
   $irc->yield(connect => {});
+  $kernel->alarm( '_check_timeout', time + 10 );
 }
 
 sub _retrieve_info {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $irc = $self->{ircobj};
 
+  ## called via timer (in irc_001)
+  
+  ## set up hash appropriately:
   $self->netinfo->{ConnectedTo} = $self->{ircserver};  
   $self->netinfo->{ServerName}  = $irc->server_name;
   $self->netinfo->{NetName} = $irc->isupport('NETWORK')
                            || $irc->server_name;
   
-  ## FIXME
-  ## called via timer
-  ## set up hash appropriately
   ## yield off commands to grab anything else needed:
   ##  - LUSERS
   ##  - LINKS
   ##  - LIST
-  ## stagger them out at reasonable intervals to avoid flood prot  
+  ## stagger them out at reasonable intervals to avoid flood prot:
+  my $alrm = 2;
+  for my $cmd (qw/LUSERS LIST LINKS/) {
+    $kernel->alarm('_issue_cmd', time + $alrm, $cmd);
+    $alrm += $self->{interval};
+  }
+}
+
+sub _issue_cmd {
+  my ($self, $type) = @_[OBJECT, ARG0];
+  my $irc = $self->{ircobj};
+  $irc->yield($type);
 }
 
 sub _check_timeout {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $irc = $self->{ircobj};
-
-  ## FIXME configurable timeout
-  ## see if it's time to quit out yet
-  ## if we've been on the server more than X secs and still can't 
-  ## dump() stats, give up for now
+  my $info = $self->netinfo;
+  
+  my $startedat = $info->{StartedAt} || return;
+  
+  if (time - $startedat > $self->{timeout}) {
+    $self->done(1);
+    $irc->yield('shutdown');
+  }
+  
+  $kernel->alarm( '_check_timeout', time + 10 );
 }
 
 ## PoCo::IRC handlers
@@ -265,7 +284,8 @@ sub irc_error {
 sub irc_001 {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $irc = $self->{ircobj};
-  ## FIXME timer to let things settle out, then grab info
+  ## let things settle out, then _retrieve_info:
+  $kernel->alarm('_retrieve_info', time + 8);
 }
 
 sub irc_375 {
