@@ -434,10 +434,140 @@ __END__
 
 =head1 NAME
 
+IRC::Indexer::Trawl::Bot - indexing trawler instance
+
 =head1 SYNOPSIS
+
+  ## Inside a POE session:
+  
+  my $trawl = IRC::Indexer::Trawl::Bot->new(
+    ## Server address and port:
+    server  => 'irc.cobaltirc.org',
+    port    => 6667,
+    
+    ## Nickname, defaults to irctrawl$rand:
+    nickname => 'mytrawler',
+    
+    ## Overall timeout for this server:
+    timeout => 120,
+    
+    ## Interval between commands (LIST/LINKS/LUSERS):
+    interval => 10,
+    
+    ## Verbosity/debugging level:
+    verbose => 0,
+  );
+  
+  ## Later:
+  if ( $trawl->done ) {
+    my $netinfo = $trawl->dump;
+    ...
+  }
 
 =head1 DESCRIPTION
 
+A single instance of an IRC::Indexer trawler.
+
+Connects to a specified server, gathers some network information, and 
+disconnects when either all requests appear to be fulfilled or the 
+specified timeout (defaults to 120 seconds) is reached.
+
+When the trawler is finished, $trawl->done will be boolean true; if 
+there was some error, $trawl->failed will be true and will contain a 
+scalar string describing the error.
+
+The B<dump()> method returns a hash reference containing network 
+information; see L</OUTPUT>, below.
+
+The trawler attempts to be polite, spacing out requests for LINKS, 
+LUSERS, and LIST; you can fine-tune the interval between commands by 
+specifying a different B<interval> at construction (defaults to 15 
+seconds).
+
+=head1 OUTPUT
+
+  my $info = $trawl->dump;
+
+The hash returned by B<dump()> has the following keys:
+
+=head2 Status
+
+FIXME
+
+=head2 Failure
+
+FIXME
+
+=head2 ConnectedTo
+
+The server address we originally connected to.
+
+=head2 ServerName
+
+The server's reported server name.
+
+=head2 NetName
+
+The network name as reported by B<ISUPPORT>, or the server's name if no 
+NETWORK is reported.
+
+=head2 GlobalUsers
+
+The global user count as reported by L<LUSERS>.
+
+=head2 OperCount
+
+The global operator count as reported by B<LUSERS>.
+
+=head2 ListLinks
+
+An array containing the output of B<LINKS>; these are essentially raw 
+lines without much parsing.
+
+=head2 ListChans
+
+An array of arrays, sorted by user count (highest first), of channel 
+names and their respective user counts and topics:
+
+  my @listchans = @{ $info->{ListChans} };
+  for my $item (@listchans) {
+    my ($name, $count, $topic) = @$item;
+    . . .
+  }
+
+Essentially a pre-sorted L</HashChans>.
+
+=head2 HashChans
+
+A hash, keyed on channel name, of the results of B<LIST>.
+
+Each channel has the keys B<Users> and B<Topic>:
+
+  for my $chan (keys %{ $info->{HashChans} }) {
+    my $this_chan  = $info->{HashChans}->{$chan};
+    my $user_count = $this_chan->{Users};
+    my $last_topic = $this_chan->{Topic};
+    . . .
+  }
+
+=head2 MOTD
+
+The server's returned MOTD, as an array reference.
+
+=head2 StartedAt
+
+The time (epoch seconds) that the trawler was constructed.
+
+=head2 ConnectedAt
+
+The time that the trawler connected to the IRC server.
+
+=head2 FinishedAt
+
+The time that the trawler finished.
+
 =head1 AUTHOR
+
+Jon Portnoy <avenj@cobaltirc.org>
 
 =cut
