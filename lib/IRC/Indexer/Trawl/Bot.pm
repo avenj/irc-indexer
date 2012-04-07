@@ -463,6 +463,22 @@ IRC::Indexer::Trawl::Bot - indexing trawler instance
     my $netinfo = $trawl->dump;
     ...
   }
+  
+  ## Spawn a bunch of trawlers in a loop:
+  my $trawlers;
+  for my $server (@servers) {
+    $trawlers->{$server} = IRC::Indexer::Trawl::Bot->new(
+      server => $server,
+    );
+  }
+  
+  ## Check on them later:
+  SERVER: for my $server (keys %$trawlers) {
+    my $trawl = $trawlers->{$server};
+    next SERVER unless $trawl->done;
+    my $netinfo = $trawl->dump;
+    . . . 
+  }
 
 =head1 DESCRIPTION
 
@@ -492,11 +508,11 @@ The hash returned by B<dump()> has the following keys:
 
 =head2 Status
 
-FIXME
+The status of the trawler; mostly used internally.
 
 =head2 Failure
 
-FIXME
+Error string as reported by $trawl->failure() -- used internally
 
 =head2 ConnectedTo
 
