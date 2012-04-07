@@ -60,7 +60,10 @@ sub new {
 
   POE::Session->create(
     object_states => [
-      $self => [ qw/
+      $self => [
+      
+      ## Internals / PoCo::IRC:
+      qw/
          _start
          
          _check_timeout
@@ -72,20 +75,22 @@ sub new {
          irc_disconnected
          irc_error
          irc_socketerr       
-
-         irc_372
-         irc_375
-         irc_376
-         
-         irc_364
-         
-         irc_251
-         irc_252
-         
-         
-         
-      / ],
-    ],
+      /,
+      
+      ## Numerics:
+        ## MOTD
+         'irc_372',
+         'irc_375',
+         'irc_376',
+        ## LINKS
+         'irc_364',
+        ## LUSERS
+         'irc_251',
+         'irc_252',
+        ## LIST
+         'irc_322',
+         'irc_323',
+    ] ],
   );
 
 
