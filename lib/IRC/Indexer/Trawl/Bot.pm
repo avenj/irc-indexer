@@ -65,6 +65,12 @@ sub new {
   $self->{ircport} = $args{port} ? $args{port} : 6667 ;
   $self->{ircnick} = $args{nickname} ? $args{nickname} : 'irctrawl'.(int rand 666);
 
+  return $self
+}
+
+sub run {
+  my ($self) = @_;
+  
   POE::Session->create(
     object_states => [
       $self => [
@@ -101,7 +107,6 @@ sub new {
          'irc_323',
     ] ],
   );
-
 
   return $self
 }
@@ -528,6 +533,8 @@ IRC::Indexer::Trawl::Bot - indexing trawler instance
     ## Verbosity/debugging level:
     verbose => 0,
   );
+
+  $trawl->run;
   
   ## Later:
   if ( $trawl->done ) {
@@ -540,7 +547,7 @@ IRC::Indexer::Trawl::Bot - indexing trawler instance
   for my $server (@servers) {
     $trawlers->{$server} = IRC::Indexer::Trawl::Bot->new(
       server => $server,
-    );
+    )->run();
   }
   
   ## Check on them later:
@@ -655,6 +662,10 @@ The time that the trawler connected to the IRC server.
 The time that the trawler finished.
 
 =head1 METHODS
+
+=head2 run
+
+Start the trawler session.
 
 =head2 failed
 

@@ -44,6 +44,7 @@ my $trawl = IRC::Indexer::Trawl::Bot->new(
 POE::Session->create(
   inline_states => {
     _start => sub {
+      $trawl->run;
       $_[KERNEL]->alarm('check', time + 20);
     },
     
