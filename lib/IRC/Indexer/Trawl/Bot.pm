@@ -656,7 +656,81 @@ The time that the trawler finished.
 
 =head1 METHODS
 
-FIXME
+=head2 failed
+
+If a trawler has encountered an error, B<failed> will return true and 
+contain a string describing the problem.
+
+=head2 done
+
+Returns boolean true if the trawler instance has finished.
+
+=head2 dump
+
+Returns the L</netinfo> hash if the trawler instance has finished, or 
+undef if not.
+
+=head2 netinfo
+
+Returns the B<netinfo> hash described in L</OUTPUT> regardless of 
+whether the trawler has finished.
+
+=head2 connectedto
+
+Returns the initially specified server name the trawler was instructed 
+to connect to.
+
+=head2 connectedat
+
+Returns the time the bot connected to IRC (epoch seconds).
+
+Returns undef if the bot is not connected.
+
+=head2 startedat
+
+Returns the time the trawler was constructed.
+
+=head2 finishedat
+
+Returns the time the trawler finished, or undef if the trawler is still 
+running.
+
+=head2 status
+
+Returns the current status as a string.
+
+=head2 network
+
+Returns the reported network name, if there is one.
+
+=head2 server
+
+Returns the reported server name.
+
+=head2 motd
+
+Returns the MOTD as an array reference.
+
+=head2 opers
+
+Returns the operator count as reported by B<LUSERS>
+
+=head2 users
+
+Returns the global user count as reported by B<LUSERS>
+
+=head2 links
+
+Returns the link list as an array reference.
+
+=head2 channels
+
+Returns the channel list as described in B</OUTPUT>.
+
+=head2 chanhash
+
+Returns the channel hash as described in B</OUTPUT>.
+
 
 =head1 AUTHOR
 

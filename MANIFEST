@@ -7,3 +7,4 @@ Makefile.PL
 README
 META.yml
 META.json
+t/01_loadable.t

@@ -1,0 +1,19 @@
+NAME
+    IRC::Indexer - IRC server indexing via POE
+
+SYNOPSIS
+    FIXME
+
+DESCRIPTION
+    A set of modules and utilities useful for trawling IRC networks,
+    collecting information, and exporting it to portable formats for use in
+    Web frontends and other applications.
+
+    FIXME frontends
+
+    See the perldoc for IRC::Indexer::Trawl::Bot for more about using the
+    trawl bot itself as part of other POE-enabled applications.
+
+AUTHOR
+    Jon Portnoy <avenj@cobaltirc.org>
+

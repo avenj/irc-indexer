@@ -5,7 +5,7 @@ author:
 build_requires:
   Test::More: 0
 configure_requires:
-  Module::Build: 0.36
+  Module::Build: 0.38
 dynamic_config: 1
 generated_by: 'Module::Build version 0.38, CPAN::Meta::Converter version 2.112150'
 license: perl
@@ -21,8 +21,11 @@ provides:
     file: lib/IRC/Indexer/Trawl/Bot.pm
     version: 0.10
 requires:
+  Data::Dumper: 0
   Getopt::Long: 0
+  JSON::XS: 0
   POE::Component::IRC::State: 6.74
+  YAML::XS: 0
   perl: v5.12.1
 resources:
   license: http://dev.perl.org/licenses/

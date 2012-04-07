@@ -11,7 +11,7 @@ my $build = Module::Build->new(
   create_readme => 1,
   
   configure_requires => {
-    'Module::Build' => '0.36',
+    'Module::Build' => '0.38',
   },
   
   build_requires => {
@@ -20,9 +20,13 @@ my $build = Module::Build->new(
   
   requires => {
     'perl' => '5.12.1',
+    'Data::Dumper' => 0,
     'Getopt::Long' => 0,
     
     'POE::Component::IRC::State' => '6.74',
+    
+    'JSON::XS' => 0,
+    'YAML::XS' => 0,
   },
 );
 
