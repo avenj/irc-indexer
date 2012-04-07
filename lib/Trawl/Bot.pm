@@ -39,8 +39,10 @@ sub new {
     ServerName  => undef,  # announced server name
     NetName     => undef,  # announced NETWORK=
     GlobalUsers => undef,  # lusers
+    OperCount   => undef,  # lusers
     ListLinks   => undef,  # available link list
     ListChans   => undef,  # available chan list    
+    HashChans   => undef,  # available chan hash
     MOTD        => undef,  # MOTD as array
     
     StartedAt   => time(),
@@ -76,6 +78,10 @@ sub new {
          irc_376
          
          irc_364
+         
+         irc_251
+         irc_252
+         
          
          
       / ],
@@ -158,7 +164,7 @@ sub done {
   }
   
   return unless defined $info->{Status} 
-         and $info->{Status} ~~ qw/DONE FAIL/;
+         and $info->{Status} ~~ [qw/DONE FAIL/];
   return $info->{Status}
 }
 
@@ -167,7 +173,7 @@ sub dump {
   my $info = $self->netinfo;
   ## return() if we're not done:
   return unless defined $info->{Status} 
-         and $info->{Status} ~~ qw/DONE FAIL/;
+         and $info->{Status} ~~ [qw/DONE FAIL/];
   ## else return hashref of net info (or failure status)
   ## that way masters can iterate through a pool of bots and check 'em
   ## frontends can serialize / store
@@ -195,10 +201,19 @@ sub _start {
 sub _retrieve_info {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $irc = $self->{ircobj};
+
+  $self->netinfo->{ConnectedTo} = $self->{ircserver};  
+  $self->netinfo->{ServerName}  = $irc->server_name;
+  $self->netinfo->{NetName} = $irc->isupport('NETWORK')
+                           || $irc->server_name;
+  
   ## FIXME
   ## called via timer
   ## set up hash appropriately
-  ## yield off commands to grab anything else needed
+  ## yield off commands to grab anything else needed:
+  ##  - LUSERS
+  ##  - LINKS
+  ##  - LIST
   ## stagger them out at reasonable intervals to avoid flood prot  
 }
 
@@ -207,6 +222,7 @@ sub _check_timeout {
   my $irc = $self->{ircobj};
 
   ## FIXME configurable timeout
+  ## see if it's time to quit out yet
   ## if we've been on the server more than X secs and still can't 
   ## dump() stats, give up for now
 }
@@ -244,26 +260,26 @@ sub irc_error {
 sub irc_001 {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $irc = $self->{ircobj};
-  $self->netinfo->{ServerName} = $irc->server_name;
   ## FIXME timer to let things settle out, then grab info
 }
 
 sub irc_375 {
   ## Start of MOTD
   my ($self, $server) = @_[OBJECT, ARG0];
+  my $info = $self->netinfo;
   $info->{MOTD} = [ "MOTD for $server:" ];
 }
 
 sub irc_372 {
   ## MOTD line
-  my ($self) = @_[OBJECT];
+  my ($self) = $_[OBJECT];
   my $info = $self->netinfo;
   push(@{ $info->{MOTD} }, $_[ARG1]);
 }
 
 sub irc_376 {
   ## End of MOTD
-  my ($self) = @_[OBJECT];
+  my ($self) = $_[OBJECT];
   my $info = $self->netinfo;
   push(@{ $info->{MOTD} }, "End of MOTD.");
 }
@@ -271,7 +287,7 @@ sub irc_376 {
 sub irc_364 {
   ## LINKS, if we can get it
   ## FIXME -- also grab ARG2 and try to create useful hash
-  my ($self) = @_[OBJECT];
+  my ($self) = $_[OBJECT];
   my $info = $self->netinfo;
   my $rawline;
   return unless $rawline = $_[ARG1];
@@ -279,7 +295,7 @@ sub irc_364 {
 }
 
 sub irc_251 {
-  my ($self) = @_[OBJECT];
+  my ($self) = $_[OBJECT];
   my $info = $self->netinfo;
   my $rawline;
   ## LUSERS
@@ -291,6 +307,55 @@ sub irc_251 {
   my ($users, $invis) = $rawline =~ m/(\d+).+(\d+)/;
   $users += $invis //= 0;
   $info->{GlobalUsers} = $users || 0;
+}
+
+sub irc_252 {
+  ## LUSERS oper count
+  my ($self) = $_[OBJECT];
+  my $info = $self->netinfo;
+  my $rawline = $_[ARG1];
+  my $count = substr($rawline, 0, 1);
+  $count = 0 unless defined $count and $count =~ m/^\d+$/;
+  $info->{OperCount} = $count;
+}
+
+sub irc_322 {
+  ## LIST
+  my ($self) = $_[OBJECT];
+  my $info = $self->netinfo;
+  my $split;
+  return unless $split = $_[ARG2];
+  my ($chan, $users, $topic) = @$split;
+  return unless $chan;
+  $users //= 0;
+  $topic //= '';
+  
+  ## Add a hash element
+  ## _323 triggers a ListChans rebuild, below
+  $info->{HashChans}->{$chan} = {
+    Topic => $topic,
+    Users => $users,
+  };
+}
+
+sub irc_323 {
+  ## LIST ended
+  ## sorted our hash into ListChans
+  my ($self) = $_[OBJECT];
+  my $info = $self->netinfo;
+  my $chash = $info->{HashChans};
+  return unless keys %$chash;
+  
+  my @sorted = sort { 
+      $chash->{$b}->{Users} <=> $chash->{$a}->{Users} 
+    } keys %$chash;
+
+  $info->{ListChans} = [];
+  for my $chan (@sorted) {
+    my $users = $chash->{$chan}->{Users};
+    my $topic = $chash->{$chan}->{Topic};
+    push(@{ $info->{ListChans} }, [ $chan, $users, $topic ]);
+  }
 }
 
 1;
