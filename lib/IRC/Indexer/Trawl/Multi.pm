@@ -6,7 +6,10 @@ use strict;
 use warnings;
 use Carp;
 
+use POE;
 use IRC::Indexer::Trawl::Bot;
+
+use Storable qw/dclone/;
 
 sub new {
   my $self = {};
@@ -23,7 +26,7 @@ sub new {
     croak "expected array of servers in servers =>"
   }
   
-  $self->{Opts} = $args;
+  $self->{Opts} = \%args;
 
   $self->{Trawlers}  = {};
   $self->{ResultSet} = {};
@@ -41,7 +44,6 @@ sub run {
         '_stop',
         
         '_check_trawlers',
-        
       ],
     ],
   );
@@ -55,9 +57,18 @@ sub _start {
   ## spawn trawlers for {ServerList}
   my $servlist = $self->{ServerList};
   for my $server (@$servlist) {
+    my($server_name, $port);
+    
+    if (ref $server eq 'ARRAY') {
+      ($server_name, $port) = @$server;
+    } else {
+      $server_name = $server;
+      $port = 6667;
+    }
+    
     $self->{Trawlers}->{$server} = IRC::Indexer::Trawl::Bot->new(
       Server   => $server,
-      Port     => $self->{Opts}->{port},
+      Port     => $port,
       ircnick  => $self->{Opts}->{nickname},
       Interval => $self->{Opts}->{interval},
       Timeout  => $self->{Opts}->{timeout},
@@ -76,11 +87,11 @@ sub _check_trawlers {
     next BOT unless $trawler->done;
     
     my $ref = $trawler->dump;
-    $self->{ResultSet}->{$trawler} = $ref;
+    $self->{ResultSet}->{$server} = $ref;
   }
 
   if (keys %{$self->{ResultSet}} == keys %{$self->{Trawlers}}) {
-    ## FIXME we're done
+    $self->done(1);
   } else {
     ## not done, reschedule
     $kernel->alarm('_check_trawlers', time + 5);
@@ -91,11 +102,71 @@ sub _check_trawlers {
 ## Methods
 
 sub done {
-
+  my ($self, $finished) = @_;
+  my $info = $self->{ResultSet};
+  
+  if ($finished) {
+    ++$self->{Status}->{Done};
+  }
+  return $self->{Status}->{Done}
 }
 
 sub dump {
-
+  ## dump the entire ResultSet
+  my ($self) = @_;
+  return unless $self->{Status}->{Done};
+  return $self->{ResultSet}
 }
 
+
 1;
+__END__
+
+=pod
+
+=head1 NAME
+
+IRC::Indexer::Trawl::Multi - Trawl multiple IRC servers
+
+=head1 SYNOPSIS
+
+  ## Inside a POE session:
+  
+  my $trawl = IRC::Indexer::Trawl::Multi->new(
+    Servers => [
+      'eris.cobaltirc.org',
+      'raider.blackcobalt.net',
+      [ 'phoenix.xyloid.org', '7000' ],
+      . . .
+    ],
+    
+    ## For other opts, see: perldoc IRC::Indexer::Trawl::Bot
+    ## They will be passed to ::Bot unmolested.
+  );
+  
+  $trawl->run;
+  
+  ## Later:
+  if ( $trawl->done ) {
+    my $trawled = $trawl->dump;
+    for my $server (keys %$trawled) {
+      my $this_server = $trawled->{$server};
+      ## See IRC::Indexer::Trawl::Bot for parsing details
+    }
+  }
+
+=head1 DESCRIPTION
+
+A simple multiplexer for L<IRC::Indexer::Trawl::Bot> instances.
+
+Given an array (reference) of server addresses, it will spawn trawlers 
+for each server that run in parallel; when they're all finished, 
+B<done()> will return boolean true and B<dump()> will return a hash 
+reference, keyed on server name, of L<IRC::Indexer::Trawl::Bot> 
+netinfo() hashes.
+
+=head1 AUTHOR
+
+Jon Portnoy <avenj@cobaltirc.org>
+
+=cut
