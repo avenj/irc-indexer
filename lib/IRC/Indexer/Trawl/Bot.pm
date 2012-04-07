@@ -25,7 +25,7 @@ sub new {
 
   $self->{State} = {};
 
-  ## an outline of NetInfo just for ease of reference
+  ## Outline of NetInfo just for ease of reference:
   $self->{NetInfo} = {
     ## Status:
     ##  undef  = nuthin' doin'
@@ -55,9 +55,10 @@ sub new {
   my %args = @_;
   $args{lc $_} = delete $args{$_} for keys %args;
 
+  $self->verbose($args{verbose} || 0);
+
   $self->{timeout}   = $args{timeout}  || 120;
   $self->{interval}  = $args{interval} || 10;
-  $self->{verbose}   = $args{verbose}  || 0;
 
   $self->{ircserver} = $args{server} ? $args{server} 
                              : croak "No Server specified in new" ;
@@ -105,32 +106,96 @@ sub new {
   return $self
 }
 
+sub verbose {
+  my ($self, $verbose) = @_;
+  return $self->{verbose} = $verbose if defined $verbose;
+  return $verbose
+}
+
+sub irc {
+  my ($self, $irc) = @_;
+  return $self->{ircobj} = $irc if $irc and ref $irc;
+  return $self->{ircobj}
+}
 
 ## Info accessors
+## Most of these have aliases matching their hash key
 
 sub netinfo {
   my ($self) = @_;
   return $self->{NetInfo}
 }
 
+sub connectedto {
+  my ($self, $server) = @_;
+  return $self->netinfo->{ConnectedTo} = $server if defined $server;
+  return $self->netinfo->{ConnectedTo}
+}
+
+sub connectedat {
+  my ($self, $ts) = @_;
+  return $self->netinfo->{ConnectedAt} = $ts if defined $ts;
+  return $self->netinfo->{ConnectedAt}
+}
+
+sub startedat {
+  my ($self, $ts) = @_;
+  return $self->netinfo->{StartedAt} = $ts if defined $ts;
+  return $self->netinfo->{StartedAt}
+}
+
+sub finishedat {
+  my ($self, $ts) = @_;
+  return $self->netinfo->{FinishedAt} = $ts if defined $ts;
+  return $self->netinfo->{FinishedAt}
+}
+
+sub status {
+  my ($self, $status) = @_;
+  return $self->netinfo->{Status} = $status if $status;
+  return $self->netinfo->{Status}
+}
+
+sub netname { network(@_) }
 sub network {
   my ($self, $netname) = @_;
   return $self->netinfo->{NetName} = $netname if $netname;
   return $self->netinfo->{NetName}
 }
 
+sub servername { server(@_) }
 sub server {
   my ($self, $serv) = @_;
   return $self->netinfo->{ServerName} = $serv if $serv;
   return $self->netinfo->{ServerName}
 }
 
+sub blank_motd {
+  my ($self) = @_;
+  $self->netinfo->{MOTD} = [];
+}
+
+sub motd {
+  my ($self, $line) = @_;
+  push(@{ $self->netinfo->{MOTD} }, $line) if $line;
+  return $self->netinfo->{MOTD}
+}
+
+sub opercount { opers(@_) }
+sub opers {
+  my ($self, $count) = @_;
+  return $self->netinfo->{OperCount} = $count if $count;
+  return $self->netinfo->{OperCount} //= 0
+}
+
+sub globalusers { users(@_) }
 sub users {
   my ($self, $global) = @_;
   return $self->netinfo->{GlobalUsers} = $global if $global;
   return $self->netinfo->{GlobalUsers}
 }
 
+sub listlinks { links(@_) }
 sub links {
   ## arrayref
   my ($self, $linklist) = @_;
@@ -141,12 +206,20 @@ sub links {
   ## FIXME diff method to return hash mapping servs -> servinfo ?
 }
 
+sub listchans { channels(@_) }
 sub channels {
-  ## arrayref
+  ## arrayref, sorted (highest usercount first)
   my ($self, $chanlist) = @_;  
   return $self->netinfo->{ListChans} = $chanlist if $chanlist
     and ref $chanlist eq 'ARRAY' ;
   return $self->netinfo->{ListChans}  
+}
+
+sub hashchans { chanhash(@_) }
+sub chanhash {
+  ## hashref
+  my ($self) = @_;
+  return $self->netinfo->{HashChans}
 }
 
 ## Status accessors
@@ -204,7 +277,7 @@ sub _start {
     server   => $self->{ircserver},
     port     => $self->{ircport},
   );
-  $self->{ircobj} = $irc;
+  $self->irc( $irc );
   $irc->yield(register => 'all');
   $irc->yield(connect => {});
   $kernel->alarm( '_check_timeout', time + 10 );
@@ -212,18 +285,20 @@ sub _start {
 
 sub _retrieve_info {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
-  my $irc = $self->{ircobj};
+  
+  ## called via alarm() (in irc_001)
 
-  ## called via timer (in irc_001)
+  my $irc = $self->irc;
   
   ## set up hash appropriately:
-  $self->netinfo->{ConnectedTo} = $self->{ircserver};  
-  $self->netinfo->{ServerName}  = $irc->server_name;
-  $self->netinfo->{NetName} = $irc->isupport('NETWORK')
-                           || $irc->server_name;
+  $self->connectedto( $self->{ircserver} );
+  $self->servername( $irc->server_name );
+  
+  my $network = $irc->isupport('NETWORK') || $irc->server_name;
+  $self->netname($network);
   
   ## yield off commands to grab anything else needed:
-  ##  - LUSERS
+  ##  - LUSERS (maybe, unless we have counts already)
   ##  - LINKS
   ##  - LIST
   ## stagger them out at reasonable intervals to avoid flood prot:
@@ -236,18 +311,17 @@ sub _retrieve_info {
 
 sub _issue_cmd {
   my ($self, $cmd) = @_[OBJECT, ARG0];
-  my $irc = $self->{ircobj};
   
   ## most servers will announce lusers at connect-time:
   return if $cmd eq 'lusers' and $self->{State}->{Lusers};
   
-  warn "-> issuing $cmd\n" if $self->{verbose};
-  $irc->yield($cmd);
+  warn "-> issuing $cmd\n" if $self->verbose;
+  $self->irc->yield($cmd);
 }
 
 sub _check_timeout {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
-  my $irc = $self->{ircobj};
+  my $irc = $self->irc;
   my $info = $self->netinfo;
   
   my $shutdown = 0;
@@ -257,7 +331,7 @@ sub _check_timeout {
   for my $state (@states) {
     next unless $self->{State}->{$state};
     $stc++;
-    warn "-> have state: $state\n" if $self->{verbose};
+    warn "-> have state: $state\n" if $self->verbose;
   }
   
   $shutdown++ if $stc == scalar @states;
@@ -267,7 +341,7 @@ sub _check_timeout {
   $shutdown++ if time - $startedat > $self->{timeout};
 
   if ($shutdown) {
-    warn "-> shutdown\n" if $self->{verbose};
+    warn "-> shutdown\n" if $self->verbose;
     $self->done(1);
     $irc->yield('disconnect');
     $irc->yield('shutdown');  
@@ -280,15 +354,13 @@ sub _check_timeout {
 
 sub irc_connected {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
-  my $irc = $self->{ircobj};
   ## report connected status; irc_001 handles the rest
-  $self->{NetInfo}->{Status} = 'CONNECTED';
-  $self->{NetInfo}->{ConnectedAt} = time;
+  $self->status('INIT');
+  $self->connectedat(time());
 }
 
 sub irc_disconnected {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
-  my $irc = $self->{ircobj};
   ## we're done, clean up and report such 
   $self->done(1);
 }
@@ -308,7 +380,7 @@ sub irc_error {
 
 sub irc_001 {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
-  my $irc = $self->{ircobj};
+  $self->status('CONNECTED');
   ## let things settle out, then _retrieve_info:
   $kernel->alarm('_retrieve_info', time + 6);
 }
@@ -317,22 +389,22 @@ sub irc_375 {
   ## Start of MOTD
   my ($self, $server) = @_[OBJECT, ARG0];
   my $info = $self->netinfo;
-  $info->{MOTD} = [ "MOTD for $server:" ];
+  $self->blank_motd;
+  $self->motd( "MOTD for $server:" );
 }
 
 sub irc_372 {
   ## MOTD line
   my ($self) = $_[OBJECT];
   my $info = $self->netinfo;
-  push(@{ $info->{MOTD} }, $_[ARG1]);
+  $self->motd( $_[ARG1] );
 }
 
 sub irc_376 {
   ## End of MOTD
   my ($self) = $_[OBJECT];
   my $info = $self->netinfo;
-  push(@{ $info->{MOTD} }, "End of MOTD.");
-  
+  $self->motd( "End of MOTD." );  
   $self->{State}->{MOTD} = 1;
 }
 
@@ -354,9 +426,8 @@ sub irc_365 {
 sub irc_251 {
   my ($self) = $_[OBJECT];
   my $info = $self->netinfo;
-  
   $self->{State}->{Lusers} = 1;
-  
+    
   my $rawline;
   ## LUSERS
   ## may require some fuckery ...
@@ -381,7 +452,7 @@ sub irc_252 {
   my $rawline = $_[ARG1];
   my $count = substr($rawline, 0, 1);
   $count = 0 unless defined $count and $count =~ m/^\d+$/;
-  $info->{OperCount} = $count;
+  $self->opercount($count);
 }
 
 sub irc_322 {
@@ -391,7 +462,7 @@ sub irc_322 {
   my $split = $_[ARG2] // return;
   my ($chan, $users, $topic) = @$split;
 
-  warn "chan -> $chan $users $topic\n" if $self->{verbose};
+  warn "chan -> $chan $users $topic\n" if $self->verbose;
 
   $users //= 0;
   $topic //= ''; 
@@ -475,8 +546,9 @@ IRC::Indexer::Trawl::Bot - indexing trawler instance
   ## Check on them later:
   SERVER: for my $server (keys %$trawlers) {
     my $trawl = $trawlers->{$server};
-    next SERVER unless $trawl->done;
-    my $netinfo = $trawl->dump;
+    my $netinfo;
+    ## dump() will return undef if we're not done:
+    next SERVER unless $netinfo = $trawl->dump;
     . . . 
   }
 
@@ -581,6 +653,10 @@ The time that the trawler connected to the IRC server.
 =head2 FinishedAt
 
 The time that the trawler finished.
+
+=head1 METHODS
+
+FIXME
 
 =head1 AUTHOR
 
