@@ -1,4 +1,4 @@
-bin/ircindexer_single
+bin/ircindexer-single
 Build.PL
 lib/IRC/Indexer.pm
 lib/IRC/Indexer/Trawl/Bot.pm

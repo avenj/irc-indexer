@@ -9,7 +9,8 @@ use IRC::Indexer::Trawl::Bot;
 
 use Data::Dumper;
 
-use JSON::XS;
+use JSON::XS qw/encode_json/;
+use YAML::XS ();
 
 my($server, $verbose);
 my $fmt = 'STDOUT';
@@ -26,6 +27,8 @@ GetOptions(
   'verbose:0' => \$verbose,
   
   'format|export=s' => \$fmt,
+  
+  ## FIXME output file
 );
 
 die "Missing --server\n" unless $server;
@@ -51,6 +54,7 @@ POE::Session->create(
 
         given ($fmt) {
           print encode_json($ref)."\n" when /JSON/i;
+          print YAML::XS::Dump($ref) when /YAML/i;
           default { print Dumper $ref }
         }
 
@@ -69,5 +73,25 @@ POE::Kernel->run;
 __END__
 
 =pod
+
+=head1 NAME
+
+ircindexer-single - Trawl a single server for network information
+
+=head1 SYNOPSIS
+
+  ircindexer-single --help
+  
+  ircindexer-single -f JSON -s irc.cobaltirc.org > cobaltirc.out
+  
+=head1 DESCRIPTION
+
+Trawl a single server for network statistics.
+
+By default, outputs human-readable Perl data structures.
+
+=head1 AUTHOR
+
+Jon Portnoy <avenj@cobaltirc.org>
 
 =cut
