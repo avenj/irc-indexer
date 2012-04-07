@@ -224,7 +224,7 @@ sub _retrieve_info {
   ##  - LIST
   ## stagger them out at reasonable intervals to avoid flood prot:
   my $alrm = 2;
-  for my $cmd (qw/LUSERS LIST LINKS/) {
+  for my $cmd (qw/lusers list links/) {
     $kernel->alarm('_issue_cmd', time + $alrm, $cmd);
     $alrm += $self->{interval};
   }
@@ -245,6 +245,7 @@ sub _check_timeout {
   
   if (time - $startedat > $self->{timeout}) {
     $self->done(1);
+    $irc->yield('disconnect');
     $irc->yield('shutdown');
   }
   
@@ -278,7 +279,7 @@ sub irc_error {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $err = $_[ARG0];
   ## errored out. clean up and report failure status
-  $self->failed("irc_error: $err");
+  $self->failed("irc_error: $err") unless $self->done;
 }
 
 sub irc_001 {
@@ -327,10 +328,15 @@ sub irc_251 {
   ## may require some fuckery ...
   ## may vary by IRCD, but in theory it should be something like:
   ## 'There are X users and Y invisible on Z servers'
-  ## Grabbing the first two numbers might do us ...
-  return unless $rawline = $_[ARG1];
-  my ($users, $invis) = $rawline =~ m/(\d+).+(\d+)/;
-  $users += $invis //= 0;
+  return unless $rawline = $_[ARG2]->[0];
+  my @chunks = split ' ', $rawline;
+  my($users, $i);
+  while (my $chunk = shift @chunks) {
+    if ($chunk =~ /\d+/) {
+      $users += $chunk;
+      last if ++$i == 2;
+    }
+  }
   $info->{GlobalUsers} = $users || 0;
 }
 
