@@ -14,8 +14,6 @@ sub new {
 sub info { netinfo(@_) }
 sub netinfo {
   my ($self) = @_;
-  ## Add ListChans before a netinfo dump:
-  $self->_sort_listchans;
   return $self->{NetInfo}
 }
 
@@ -148,6 +146,7 @@ sub add_channel {
 sub _sort_listchans {
   my ($self) = @_;
   my $chash = $self->netinfo->{HashChans}//{};
+  return unless keys %$chash;
   my @sorted = sort {
       $chash->{$b}->{Users} <=> $chash->{$a}->{Users}
     } keys %$chash;
