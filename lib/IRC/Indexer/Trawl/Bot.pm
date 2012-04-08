@@ -158,8 +158,6 @@ sub dump {
 sub _stop {}
 sub _start {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
-
-  my $irc = POE::Component::IRC->spawn(
   
   my %ircopts = (
     nick     => $self->{ircnick},
@@ -170,6 +168,8 @@ sub _start {
     useipv6  => $self->{useipv6},
   );
   $ircopts{localaddr} = $self->{bindaddr} if $self->{bindaddr};
+  
+  my $irc = POE::Component::IRC->spawn( %ircopts );
   $self->irc( $irc );
   
   $irc->plugin_add('CTCP' =>
