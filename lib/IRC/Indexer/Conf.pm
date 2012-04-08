@@ -179,3 +179,42 @@ sub write_example_cf {
 
 1;
 __END__
+
+=pod
+
+=head1 NAME
+
+IRC::Indexer::Conf - Handle YAML configuration files
+
+=head1 SYNOPSIS
+
+  my $conf = IRC::Indexer::Conf->new;
+  
+  my $cfhash = $conf->parse_conf($path);
+  
+  ## Recursively read server spec files:
+  my $nethash = $conf->parse_nets($specfile_dir);
+
+=head1 DESCRIPTION
+
+Deserialize IRC::Indexer configuration files.
+
+FIXME
+
+=head1 METHODS
+
+FIXME
+
+=head2 parse_conf
+
+=head2 parse_nets
+
+=head2 find_nets
+
+=head2 
+
+=head1 AUTHOR
+
+Jon Portnoy <avenj@cobaltirc.org>
+
+=cut

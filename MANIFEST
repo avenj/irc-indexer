@@ -1,5 +1,6 @@
 bin/ircindexer-single
 bin/ircindexer-multi
+bin/ircindexer-server-json
 Build.PL
 lib/IRC/Indexer.pm
 lib/IRC/Indexer/Conf.pm
