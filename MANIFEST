@@ -1,4 +1,5 @@
 bin/ircindexer-single
+bin/ircindexer-multi
 Build.PL
 lib/IRC/Indexer.pm
 lib/IRC/Indexer/Output.pm

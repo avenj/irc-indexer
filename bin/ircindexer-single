@@ -129,8 +129,10 @@ ircindexer-single - Trawl a single server for network information
 
 =head1 SYNOPSIS
 
+  ## Get complete usage details:
   ircindexer-single --help
   
+  ## Simple usage example:
   ircindexer-single -f JSON -s irc.cobaltirc.org -o cobaltirc.out
   
 =head1 DESCRIPTION
