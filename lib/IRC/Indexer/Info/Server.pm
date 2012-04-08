@@ -1,6 +1,11 @@
 package IRC::Indexer::Info::Server;
 our $VERSION = '0.01';
 
+use 5.12.1;
+use strict;
+use warnings;
+use Carp;
+
 ## A single server.
 
 sub new {
@@ -74,7 +79,7 @@ sub network {
 sub servername { server(@_) }
 sub server {
   my ($self, $server) = @_;
-  return $self->netinfo->{ServerName} = $serv if $serv;
+  return $self->netinfo->{ServerName} = $server if $server;
   return $self->netinfo->{ServerName}
 }
 
@@ -92,8 +97,8 @@ sub motd {
 sub opercount { opers(@_) }
 sub opers {
   my ($self, $opers) = @_;
-  return $self->netinfo->{OperCount} = $count
-    if defined $count;
+  return $self->netinfo->{OperCount} = $opers
+    if defined $opers;
   return $self->netinfo->{OperCount}
 }
 
@@ -116,7 +121,7 @@ sub links {
 
 sub listchans { channels(@_) }
 sub channels {
-  my ($self, $list) = @_;
+  my ($self, $chanlist) = @_;
   return $self->netinfo->{ListChans} = $chanlist
     if $chanlist and ref $chanlist eq 'ARRAY';
   $self->_sort_listchans;
@@ -136,7 +141,7 @@ sub add_channel {
   return unless $channel;
   $users //= 0;
   $topic //= '';
-  $self->netinfo->{HashChans}->{$chan} = {
+  $self->netinfo->{HashChans}->{$channel} = {
     Topic => $topic,
     Users => $users,
   };

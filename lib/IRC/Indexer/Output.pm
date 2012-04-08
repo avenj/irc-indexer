@@ -20,6 +20,11 @@ sub new {
   return $self
 }
 
+sub dump {
+  my ($self) = @_;
+  return $self->{Output}
+}
+
 sub write {
   my ($self, $path) = @_;
   

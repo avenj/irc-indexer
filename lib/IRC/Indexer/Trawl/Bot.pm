@@ -86,8 +86,6 @@ sub run {
          'irc_323',
     ] ],
   );
-
-  return $self
 }
 
 sub verbose {
@@ -174,7 +172,8 @@ sub _retrieve_info {
   
   my $info = $self->info;
   ## set up hash appropriately:
-  $info->connectedto( $self->{ircserver} );
+  my $server = $self->{ircserver};
+  $info->connectedto( $server );
   $info->servername( $irc->server_name );
   
   my $network = $irc->isupport('NETWORK') || $irc->server_name;

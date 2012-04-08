@@ -7,10 +7,9 @@ use warnings;
 use POE;
 use IRC::Indexer::Trawl::Bot;
 
-use Data::Dumper;
-
-use JSON::XS qw/encode_json/;
-use YAML::XS ();
+use IRC::Indexer::Output::JSON;
+use IRC::Indexer::Output::YAML;
+use IRC::Indexer::Output::Dumper;
 
 my($server, $verbose);
 my $fmt = 'STDOUT';
@@ -54,11 +53,27 @@ POE::Session->create(
         warn "Done\n";
 
         given ($fmt) {
-          print encode_json($ref)."\n" when /JSON/i;
-          print YAML::XS::Dump($ref) when /YAML/i;
-          default { print Dumper $ref }
+          when ("JSON") {
+            my $output = IRC::Indexer::Output::JSON->new(
+              Input => $ref,
+            );
+            print $output->dump;
+          }
+          
+          when ("YAML") {
+            my $output = IRC::Indexer::Output::YAML->new(
+              Input => $ref,
+            );
+            print $output->dump;
+          }
+          
+          default {
+            my $output = IRC::Indexer::Output::Dumper->new(
+              Input => $ref,
+            );
+            print $output->dump;          
+          }
         }
-
         $_[KERNEL]->stop;
         exit 0
       } else {
