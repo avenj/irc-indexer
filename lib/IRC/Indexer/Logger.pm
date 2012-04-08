@@ -68,3 +68,43 @@ sub log_to {
 }
 
 1;
+__END__
+=pod
+
+=head1 NAME
+
+IRC::Indexer::Logger - simple interface to Log::Handler
+
+=head1 SYNOPSIS
+
+  my $handler = IRC::Indexer::Logger->new(
+    ## Path to output file:
+    LogFile  => $logfile_path,
+
+    ## Typically 'debug', 'info', 'warn':
+    LogLevel => 'info',
+  );
+
+  ## Switch to a different file:
+  $handler->log_to($new_logfile);
+  
+  ## Access the actual logger:
+  my $logger = $handler->logger;
+  
+  ## Log things:
+  $logger->info("Something informative");
+  $logger->warn("Something went wrong!");
+  $logger->debug("Things are happening.");
+  
+=head1 DESCRIPTION
+
+Simplified construction of Log::Handler instances for IRC::Indexer 
+frontends.
+
+See the SYNOPSIS for usage details.
+
+=head1 AUTHOR
+
+Jon Portnoy <avenj@cobaltirc.org>
+
+=cut

@@ -2,12 +2,15 @@ bin/ircindexer-single
 bin/ircindexer-multi
 Build.PL
 lib/IRC/Indexer.pm
+lib/IRC/Indexer/Conf.pm
+lib/IRC/Indexer/Logger.pm
 lib/IRC/Indexer/Output.pm
 lib/IRC/Indexer/Output/Dumper.pm
 lib/IRC/Indexer/Output/JSON.pm
 lib/IRC/Indexer/Output/YAML.pm
 lib/IRC/Indexer/Trawl/Bot.pm
 lib/IRC/Indexer/Trawl/Multi.pm
+lib/IRC/Indexer/Info/Network.pm
 lib/IRC/Indexer/Info/Server.pm
 MANIFEST			This list of files
 Makefile.PL
