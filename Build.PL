@@ -22,7 +22,9 @@ my $build = Module::Build->new(
     'perl' => '5.12.1',
     'Data::Dumper' => 0,
     'Getopt::Long' => 0,
-    'Storable' => 0,
+    'Storable'     => 0,
+
+    'IRC::Utils' => 0,
     
     'POE::Component::IRC::State' => '6.74',
     
