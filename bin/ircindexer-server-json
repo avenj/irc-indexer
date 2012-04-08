@@ -14,6 +14,7 @@ use URI;
 
 use POEx::HTTP::Server;
 
+use Scalar::Util qw/blessed/;
 use Storable qw/dclone/;
 
 my $opts = {
@@ -35,6 +36,10 @@ GetOptions( $opts,
     
     port:8700
     
+    config=s
+    
+    loglevel=s
+    
   /,
 );
 
@@ -46,7 +51,7 @@ my $obj = {
 };
 
 my $state = { 
-  networks => {
+  netinfo => {
     ## hash keyed on network name
     ## each network is a hash keyed on server name
     ## containing Info::Server objects
@@ -60,19 +65,84 @@ my $state = {
 };
 
 my $cfg = { 
-  ## build out of network dirs:
-  NetworkList => [],
-  
+  Networks => {},
   Interval => 15,
   Timeout  => 90,
   
   LogFile  => undef,
+  LogLevel => undef,
   LogHTTP  => undef,
   LogIRC   => undef,
 };
 
 sub get_cfg {
   ## set up $cfg and logging
+  
+  die "No --config specified.\n" unless $opts->{config};
+  
+  die "Specified conf nonexistant: $opts->{config}"
+    unless -e $opts->{config};
+
+  die "Specified conf not readable: $opts->{config}"
+    unless -r $opts->{config};
+  
+  my $conf = IRC::Indexer::Conf->new;
+  my $cfhash;
+  
+  {
+    local $@;
+    eval { $cfhash = $conf->parse_conf($opts->{config}) };
+    die "Could not parse conf: $@" if $@;
+  }
+  
+  unless ($cfhash->{NetworkDir}) {
+    die "Configuration directive missing: NetworkDir\n"
+  }
+    
+  for my $thisopt (keys %$cfg) {
+    $cfg->{$thisopt} = $cfhash->{$thisopt};
+  }
+  
+  if ($cfg->{LogFile}) {
+    my $loglevel = $opts->{loglevel} || $cfg->{LogLevel} || 'info' ;
+    my $handler = IRC::Indexer::Logger->new(
+      LogFile  => $cfg->{LogFile},
+      LogLevel => $loglevel,
+    );
+    $obj->{Log} = $handler->logger;
+  }
+  
+  my $nethash = $conf->parse_nets($cfhash->{NetworkDir});
+  $cfg->{Networks} = $nethash;
+}
+
+sub log_to {
+  ## log_to('http', 'warn', ...)
+  ## log_to('irc', 'info', ...)
+  ## null-op if there's no logger present
+  my ($type, $level, @lines) = @_;
+  return unless @lines;
+  my $log = $obj->{Log};
+  return unless blessed $log;
+  
+  given (lc $type) {
+  
+    when ("http") {
+      return unless $cfg->{LogHTTP};
+      $log->$level("$type ", @lines);
+    }
+    
+    when ("irc") {
+      return unless $cfg->{LogIRC};
+      $log->$level("$type ", @lines);
+    }
+    
+    default {
+      ## anything else goes right to the log:
+      $log->$level("$type ", @lines);
+    }
+  
+  }
 }
 
 sub poco_cfg_httpd {
@@ -100,6 +170,8 @@ sub poco_cfg_httpd {
     handlers => dclone($state->{handlers}),
   );
   
+  log_to('http', 'info', 'HTTP configured');
+  
   return 1
 }
 
@@ -115,6 +187,7 @@ sub poco_init_session {
     ],
   );
 
+  log_to('session', 'debug', 'Session initialized');
 }
 
 sub _timer_chk {
@@ -125,6 +198,8 @@ sub _timer_chk {
 sub _start {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   $kernel->alias_set('indexerhttp');
+
+  log_to('session', 'debug', 'Session started');
 
   ## init httpd
   my @htstates = poco_cfg_httpd();
@@ -142,6 +217,14 @@ sub _stop {}
 sub h_error_404 {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($req, $resp) = @_[ARG0, ARG1];
+  
+  my $uri  = URI->new( $req->uri );
+  my $path = $uri->path;
+  my $conn = $req->connection;
+  my $addr = $conn->remote_addr;
+  
+  log_to('http', 'info', "$addr 404 $path");
+  
   $resp->error(404, "Undefined action: ".$req->uri);
 }
 
@@ -158,6 +241,11 @@ sub h_root {
    </html>
   ");
   $resp->respond;
+
+  my $conn = $req->connection;
+  my $addr = $conn->remote_addr;
+  log_to('http', 'info', "$addr 200 h_root");
+
   $resp->done;
 }
 
@@ -173,8 +261,14 @@ sub h_server {
   my ($req, $resp)       = @_[ARG0, ARG1];
   my ($network, $server) = @_[ARG2, ARG3];
   ## handed off by h_network
-  
+
+
   $resp->respond;
+
+  my $conn = $req->connection;
+  my $addr = $conn->remote_addr;
+  log_to('http', 'info', "$addr 200 h_server $network $server");
+  
   $resp->done;
 }
 
@@ -209,16 +303,16 @@ sub h_network {
   ## FIXME set up JSON content 
 
   $resp->respond;
+
+  my $conn = $req->connection;
+  my $addr = $conn->remote_addr;
+  log_to('http', 'info', "$addr 200 h_network $network");
   $resp->done;
 }
 
 poco_init_session();
 POE::Kernel->run;
 
-## FIXME
-##  get a specified conf and set up a logger
-##  run Multi trawlers at intervals
-##  serve JSON (from memory? berkdb as on-disk cache?)
 __END__
 
 =pod
