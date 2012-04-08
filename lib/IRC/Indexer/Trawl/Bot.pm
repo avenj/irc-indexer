@@ -17,6 +17,7 @@ use IRC::Indexer::Info::Server;
 
 use POE;
 use POE::Component::IRC::State;
+use POE::Component::IRC::CTCP;
 
 use IRC::Utils qw/
   decode_irc
@@ -163,8 +164,16 @@ sub _start {
     port     => $self->{ircport},
   );
   $self->irc( $irc );
+  
+  $irc->plugin_add('CTCP' =>
+    POE::Component::IRC::Plugin::CTCP->new(
+      version => __PACKAGE__.' '.$VERSION,
+    );
+  );
+  
   $irc->yield(register => 'all');
   $irc->yield(connect => {});
+  
   $kernel->alarm( '_check_timeout', time + 10 );
 }
 
