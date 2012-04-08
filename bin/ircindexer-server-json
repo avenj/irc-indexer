@@ -1,0 +1,155 @@
+#!perl
+use 5.12.1;
+use strict;
+use warnings;
+
+use POE;
+
+use IRC::Indexer;
+use IRC::Indexer::Conf;
+use IRC::Indexer::Logger;
+use IRC::Indexer::Output::JSON;
+
+use POEx::HTTP::Server;
+
+my $opts = {
+  help => sub {
+  
+  }
+  
+  version => sub {
+  
+  }
+  
+  
+};
+use Getopt::Long;
+GetOptions( $opts,
+  qw/
+    help version
+    
+    port:8700
+    
+  /,
+);
+
+## Hash containing useful objects.
+my $obj = {
+  Log    => undef,
+  Cfg    => undef,
+  HTTP   => undef,
+  Multi  => undef,
+};
+my $state = { timers => {} };
+
+sub get_cfg {
+
+}
+
+sub poco_cfg_httpd {
+  $state->{handlers} = [
+    '^/$' => 'poe:indexerhttp/h_root',
+
+    '^/stats'   => 'poe:indexerhttp/h_stats', 
+    '^/server'  => 'poe:indexerhttp/h_server',
+    '^/network' => 'poe:indexerhttp/h_network',
+
+    '' => 'poe:indexerhttp/h_error_404',
+  ];
+
+
+  POEx::HTTP::Server->spawn(
+    inet => {
+      LocalPort => $opts->{port},
+    },
+    
+    handlers => $state->{handlers},
+  );
+  
+  my %handlers = @{$state->{handlers}};
+  return keys %handlers
+}
+
+sub poco_init_session {
+  ## create 'indexerhttp' session
+  POE::Session->create(
+    package_states => [
+      main => [
+        _start,
+        _stop,
+        
+        _timer_chk,
+      ],
+    ],
+  );
+
+}
+
+sub _timer_chk {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my $pool = $state->{timers};
+}
+
+sub _start {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  $kernel->alias_set('indexerhttp');
+
+  ## init httpd
+  my @htstates = poco_cfg_httpd();
+  
+  ## add states from $state->{handlers}
+  $kernel->state($_, __PACKAGE__) for @{$state->{handlers}};
+}
+
+sub _stop {}
+
+## HTTP states
+
+sub h_error_404 {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($req, $resp) = @_[ARG0, ARG1];
+  $resp->error(404, "No action to take: ".$req->path);
+}
+
+sub h_root {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($req, $resp) = @_[ARG0, ARG1];
+  ## templated html root ?
+  $resp->content_type('text/html');
+  $resp->content("
+   <html><head><title>IRC::Indexer</title></head>
+   <body>
+   <p>Running.</p>
+   </body>
+   </html>
+  ");
+  $resp->done;
+}
+
+sub h_stats {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($req, $resp) = @_[ARG0, ARG1];
+
+  $resp->done;
+}
+
+sub h_server {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($req, $resp) = @_[ARG0, ARG1];
+  ## handler for /server/...
+  
+  $resp->done;
+}
+
+sub h_network {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($req, $resp) = @_[ARG0, ARG1];
+  ## handler for /network/...
+
+  $resp->done;
+}
+
+## FIXME
+##  get a specified conf and set up a logger
+##  run Multi trawlers at intervals
+##  serve JSON (from memory? berkdb as on-disk cache?)
