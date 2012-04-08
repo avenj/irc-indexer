@@ -48,6 +48,9 @@ sub new {
     || croak "No Server specified in new" ;
   $self->{ircport} = $args{port} || 6667 ;
   $self->{ircnick} = $args{nickname} || 'irctrawl'.(int rand 666);
+  
+  $self->{bindaddr} = $args{bindaddr} if $args{bindaddr};
+  $self->{useipv6}  = $args{ipv6} || 0;
 
   return $self
 }
@@ -157,12 +160,16 @@ sub _start {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
 
   my $irc = POE::Component::IRC->spawn(
+  
+  my %ircopts = (
     nick     => $self->{ircnick},
     username => 'ircindexer',
     ircname  => __PACKAGE__,
     server   => $self->{ircserver},
     port     => $self->{ircport},
+    useipv6  => $self->{useipv6},
   );
+  $ircopts{localaddr} = $self->{bindaddr} if $self->{bindaddr};
   $self->irc( $irc );
   
   $irc->plugin_add('CTCP' =>
@@ -395,20 +402,26 @@ IRC::Indexer::Trawl::Bot - indexing trawler instance
   
   my $trawl = IRC::Indexer::Trawl::Bot->new(
     ## Server address and port:
-    server  => 'irc.cobaltirc.org',
-    port    => 6667,
+    Server  => 'irc.cobaltirc.org',
+    Port    => 6667,
     
     ## Nickname, defaults to irctrawl$rand:
-    nickname => 'mytrawler',
+    Nickname => 'mytrawler',
+    
+    ## Local address to bind, if needed:
+    BindAddr => '1.2.3.4',
+    
+    ## IPv6 trawler:
+    UseIPV6 => 1,
     
     ## Overall timeout for this server:
-    timeout => 120,
+    Timeout => 120,
     
     ## Interval between commands (LIST/LINKS/LUSERS):
-    interval => 10,
+    Interval => 10,
     
     ## Verbosity/debugging level:
-    verbose => 0,
+    Verbose => 0,
   );
 
   $trawl->run;
