@@ -18,7 +18,7 @@ sub dump {
 sub write {
   my ($self, $path) = @_;
   my $input = $self->{Input};
-  $self->{Output} = Dump($input);
+  $self->{Output} = YAML::XS::Dump($input);
   $self->SUPER::write($path);
 }
 
