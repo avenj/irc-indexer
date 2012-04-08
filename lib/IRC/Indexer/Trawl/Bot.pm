@@ -168,7 +168,7 @@ sub _start {
   $irc->plugin_add('CTCP' =>
     POE::Component::IRC::Plugin::CTCP->new(
       version => __PACKAGE__.' '.$VERSION,
-    );
+    ),
   );
   
   $irc->yield(register => 'all');
