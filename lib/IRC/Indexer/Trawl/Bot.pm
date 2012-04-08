@@ -17,7 +17,7 @@ use IRC::Indexer::Info::Server;
 
 use POE;
 use POE::Component::IRC::State;
-use POE::Component::IRC::CTCP;
+use POE::Component::IRC::Plugin::CTCP;
 
 use IRC::Utils qw/
   decode_irc

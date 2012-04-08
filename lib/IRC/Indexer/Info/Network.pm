@@ -6,6 +6,8 @@ use strict;
 use warnings;
 use Carp;
 
+use Scalar::Util qw/blessed/;
+
 sub new {
   my $self = {},
   my $class = shift;
@@ -79,15 +81,17 @@ sub finishedat {
 
 sub add_server {
   my ($self, $info) = @_;
-  ## given a Info::Server object, merge to this Network
-  return unless $info and ref $info;
-  my $name = $info->server;
-  my $motd = $info->motd;  
+  ## given a Info::Server object (or subclass), merge to this Network
+  croak "add_server needs an IRC::Indexer::Info::Server obj"
+    unless blessed $info;
   
   ## keyed on reported server name
   ## will "break"-ish on dumb nets announcing dumb names:
   my $network = $self->{Network};
   my $servers = $network->{Servers};
+
+  my $name = $info->server;
+  my $motd = $info->motd;  
   $servers->{$name}->{MOTD} = $motd;
   
   ## these can all be overriden network-wide:

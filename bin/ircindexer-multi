@@ -49,10 +49,13 @@ sub read_cf {
   my ($path) = @_;
   my $cf = slurp($path) or die "empty configuration? conf: $path\n";
   ## FIXME
+  ## set up and verify cfg
+  ## try to create OutputDir if it doesn't exist
 }
 
 sub read_net_dir {
   ## FIXME find .network specs recursively
+  ##  set up cfg hash for them
 }
 
 sub slurp {
@@ -62,6 +65,14 @@ sub slurp {
   { local $/; $slurped = <$fh> }
   close $fh;
   return $slurped
+}
+
+sub _start {
+
+  ## FIXME
+  ## Spawn pool of trawlers
+  ## Feed successful trawlers to Info::Network
+  ## When everyone is done, call write-out
 }
 
 sub example_cf {
