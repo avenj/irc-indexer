@@ -8,6 +8,7 @@ use POE;
 use IRC::Indexer;
 use IRC::Indexer::Conf;
 use IRC::Indexer::Logger;
+use IRC::Indexer::Info::Network;
 use IRC::Indexer::Output::JSON;
 
 use URI;
@@ -51,6 +52,8 @@ my $obj = {
   
   ##  network -> server -> $obj
   Trawlers => {},
+  ## Info::Network objects per-network:
+  NetInfo => {},
 };
 
 my $state = { 
@@ -249,15 +252,29 @@ sub _trawler_chk {
       );
       
       ## cache JSONified output
-      $json->{$network}->{$server} = $js->dump;
+      $json->{Servers}->{$network}->{$server} = $js->dump;
       log_to('irc', 'debug',
         "Cached JSON: $network ($server)"
       );
+      
+      ## create an Info::Network if we don't have one
+      $obj->{NetInfo}->{$network} = IRC::Indexer::Info::Network->new()
+        unless blessed $obj->{NetInfo}->{$network};
+      
+      ## feed it this server's Info object:
+      $obj->{NetInfo}->{$network}->add_server(
+        $trawler->info
+      );
+      
+      ## cache or refresh JSON for that, too:
+      my $ref = $obj->{NetInfo}->{$network};
+      my $n_js = IRC::Indexer::Output::JSON->new(
+        Input => $ref,
+      );
+      
+      $json->{Networks}->{$network} = $n_js->dump;
     }
   }
-  
-  ## FIXME method/event to merge servers into networks
-  ## ::Network can do some of this ?
   
   if (@remaining) {
     $kernel->yield('_trawler_chk', @remaining);
@@ -366,15 +383,15 @@ sub h_server {
 
   ## don't autoviv on failed requests:
   unless (
-    exists $json->{$network} 
-    && defined $json->{$network}->{$server}
+    exists $json->{Servers}->{$network} 
+    && defined $json->{Servers}->{$network}->{$server}
   ) {
     ## no JSON for this server, 404
     $kernel->yield( h_error_404 => $req, $resp );
     return
   }
 
-  my $json = $json->{$network}->{$server};
+  my $json = $json->{Servers}->{$network}->{$server};
   
   $resp->content_type('application/json');
   $resp->content($json);
@@ -403,7 +420,7 @@ sub h_network {
     $kernel->yield( h_error_404 => $req, $resp );
     return
   }
-  
+    
   ## if this is a /network/<net>/server, hand it off
   if ($chunks[1] && $chunks[1] eq "server") {
     my $server = $chunks[2];
@@ -412,11 +429,16 @@ sub h_network {
     $kernel->yield( h_server => $req, $resp, $network, $server );
     return
   }
+
+  unless (defined $json->{Networks}->{$network}) {
+    $kernel->yield( h_error_404 => $req, $resp );
+    return
+  }
   
-  ## else, this should be a request for netinfo hash
-  ## FIXME handler for this
-  ## FIXME 404 if we don't know this network
-  ## FIXME set up JSON content 
+  my $json = $json->{Networks}->{$network};
+  
+  $resp->content_type('application/json');
+  $resp->content($json);
 
   $resp->respond;
 
