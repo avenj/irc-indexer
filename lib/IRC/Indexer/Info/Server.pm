@@ -176,6 +176,8 @@ IRC::Indexer::Info::Server - Server information class for IRC::Indexer
   . . .
   
   my $ref = $info->netinfo;
+  
+  ## See below for other methods.
 
 =head1 DESCRIPTION
 
