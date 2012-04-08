@@ -111,6 +111,12 @@ sub done {
   return $self->{Status}->{Done}
 }
 
+sub trawler {
+  my ($self, $server) = @_;
+  return unless $server and $self->{Trawlers}->{$server};
+  return $self->{Trawlers}->{$server}
+}
+
 sub dump {
   ## dump the entire ResultSet
   my ($self) = @_;
@@ -132,7 +138,7 @@ IRC::Indexer::Trawl::Multi - Trawl multiple IRC servers
 
   ## Inside a POE session:
   
-  my $trawl = IRC::Indexer::Trawl::Multi->new(
+  my $multi = IRC::Indexer::Trawl::Multi->new(
     Servers => [
       'eris.cobaltirc.org',
       'raider.blackcobalt.net',
@@ -144,15 +150,27 @@ IRC::Indexer::Trawl::Multi - Trawl multiple IRC servers
     ## They will be passed to ::Bot unmolested.
   );
   
-  $trawl->run;
+  $multi->run;
   
   ## Later:
-  if ( $trawl->done ) {
-    my $trawled = $trawl->dump;
+  if ( $multi->done ) {
+    my $trawled = $multi->dump;
     for my $server (keys %$trawled) {
-      my $this_server = $trawled->{$server};
-      ## See IRC::Indexer::Trawl::Bot for parsing details
+      ## The server information hash:
+      my $this_hash    = $trawled->{$server};
+      
+      ## Get IRC::Indexer::Trawl::Bot object:
+      my $this_trawler = $multi->trawler($server);
+      
+      ## Get IRC::Indexer::Info::Server object:
+      my $this_info    = $this_trawler->info;
+      
+      ## For parsing details, see:
+      ##  perldoc IRC::Indexer::Trawl::Bot
+      ##  perldoc IRC::Indexer::Info::Server
     }
+  } else {
+    ## Active trawlers remain.
   }
 
 =head1 DESCRIPTION
