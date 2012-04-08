@@ -228,6 +228,7 @@ sub _trawler_chk {
   
   ## check trawlers in a loop, 10 at a time
   until (!@remaining || $idx == 10) {
+    ++$idx;
     my $item = shift @remaining;
     my ($trawler, $network, $server) = @$item;
     if ($trawler->done) {
@@ -247,7 +248,7 @@ sub _trawler_chk {
         Input => $trawler->dump,
       );
       
-      ## save JSONified output
+      ## cache JSONified output
       $json->{$network}->{$server} = $js->dump;
       log_to('irc', 'debug',
         "Cached JSON: $network ($server)"
@@ -363,6 +364,20 @@ sub h_server {
   my ($network, $server) = @_[ARG2, ARG3];
   ## handed off by h_network
 
+  ## don't autoviv on failed requests:
+  unless (
+    exists $json->{$network} 
+    && defined $json->{$network}->{$server}
+  ) {
+    ## no JSON for this server, 404
+    $kernel->yield( h_error_404 => $req, $resp );
+    return
+  }
+
+  my $json = $json->{$network}->{$server};
+  
+  $resp->content_type('application/json');
+  $resp->content($json);
 
   $resp->respond;
 
