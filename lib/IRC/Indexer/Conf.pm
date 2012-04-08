@@ -8,7 +8,9 @@ use Carp;
 
 use File::Find;
 
-use YAML::XS;
+use Storable qw/dclone/;
+
+use YAML::XS ();
 
 sub new {
   my $self = {};
@@ -20,9 +22,17 @@ sub new {
 sub parse_conf {
   my ($self, $path) = @_;
   
-  ## FIXME
-  ## try to load a YAML conf file
-  ## format for these may vary
+  unless (-e $path && -r $path) {
+    croak "Could not read conf at $path: $!"
+  }
+  
+  my $yaml = $self->slurp($path);
+  
+  croak "No data returned from $path" unless $yaml;
+
+  my $ref = YAML::XS::Load($yaml);
+  
+  return $ref
 }
 
 sub parse_nets {
@@ -33,13 +43,23 @@ sub parse_nets {
   my @specfiles = $self->find_nets($dir);
 
   SERV: for my $specpath (@specfiles) {
-    ## FIXME
-    ## try to load YAML conf (parse_conf)
-    ## create conf hash keyed on network name
-    ## containing per-server configuration values
+    my $this_spec = $self->parse_conf($specpath);
+    
+    unless ($this_spec->{Server}) {
+      croak "specfile missing Server definition: $specpath"
+    }
+    
+    unless ($this_spec->{Network}) {
+      croak "specfile missing Network definition: $specpath"
+    }
+    
+    my $servname = $this_spec->{Server};
+    my $netname  = $this_spec->{Network};
+    
+    $nethash->{$netname}->{$servname} = dclone($this_spec);
   }
 
-  return $nethash;
+  return $nethash
 }
 
 sub find_nets {
@@ -66,7 +86,7 @@ sub find_nets {
 sub slurp {
   my ($path) = @_;
   my $slurped;
-  open my $fh, '<', $path or croak "open failed: $!";
+  open my $fh, '<:encoding(utf8)', $path or croak "open failed: $!";
   { local $/; $slurped = <$fh> }
   close $fh;
   return $slurped
