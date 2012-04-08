@@ -44,10 +44,10 @@ sub new {
   $self->{timeout}   = $args{timeout}  || 120;
   $self->{interval}  = $args{interval} || 10;
 
-  $self->{ircserver} = $args{server} ? $args{server} 
-                             : croak "No Server specified in new" ;
-  $self->{ircport} = $args{port} ? $args{port} : 6667 ;
-  $self->{ircnick} = $args{nickname} ? $args{nickname} : 'irctrawl'.(int rand 666);
+  $self->{ircserver} = $args{server} 
+    || croak "No Server specified in new" ;
+  $self->{ircport} = $args{port} || 6667 ;
+  $self->{ircnick} = $args{nickname} || 'irctrawl'.(int rand 666);
 
   return $self
 }
@@ -371,7 +371,6 @@ sub irc_322 {
   $topic //= ''; 
   
   ## Add a hash element
-  ## _323 triggers a ListChans rebuild, below
   $info->add_channel($chan, $users, $topic);
 }
 
