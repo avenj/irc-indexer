@@ -18,6 +18,11 @@ use IRC::Indexer::Info::Server;
 use POE;
 use POE::Component::IRC::State;
 
+use IRC::Utils qw/
+  decode_irc
+  strip_color strip_formatting
+/;
+
 ## Methods
 
 sub new {
@@ -345,7 +350,12 @@ sub irc_322 {
   my $info = $self->info;
   my $split = $_[ARG2] // return;
   my ($chan, $users, $topic) = @$split;
-
+  
+  $chan  = decode_irc($chan);
+  $topic = decode_irc(
+    strip_color( strip_formatting($topic) )
+  );
+  
   warn "chan -> $chan $users $topic\n" if $self->verbose;
 
   $users //= 0;
