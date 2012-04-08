@@ -56,11 +56,29 @@ sub _start {
   
   ## spawn trawlers for {ServerList}
   my $servlist = $self->{ServerList};
-  for my $server (@$servlist) {
+  SERVER: for my $server (@$servlist) {
     my($server_name, $port);
+    
+    my $ircnick  = $self->{Opts}->{nickname};
+    my $interval = $self->{Opts}->{interval};
+    my $timeout  = $self->{Opts}->{timeout};
+    
+    my $ipv6 = 0;
+    my $bindaddr = undef;
     
     if (ref $server eq 'ARRAY') {
       ($server_name, $port) = @$server;
+    } elsif (ref $server eq 'HASH') {
+      ## Passed a hash created from a server spec
+      $server_name = $server->{Server}
+      || croak "Passed a server configured hash with no Server defined";
+
+      $port        = $server->{Port} || 6667;
+      $ircnick     = $server->{Nickname} if $server->{Nickname};
+      $bindaddr    = $server->{BindAddr} if $server->{BindAddr};
+      $ipv6        = 1                   if $server->{UseIPV6};
+      $timeout     = $server->{Timeout}  if $server->{Timeout};
+      $interval    = $server->{Interval} if $server->{Interval};
     } else {
       $server_name = $server;
       $port = 6667;
@@ -69,9 +87,11 @@ sub _start {
     $self->{Trawlers}->{$server} = IRC::Indexer::Trawl::Bot->new(
       Server   => $server,
       Port     => $port,
-      ircnick  => $self->{Opts}->{nickname},
-      Interval => $self->{Opts}->{interval},
-      Timeout  => $self->{Opts}->{timeout},
+      Nickname => $ircnick,
+      Interval => $interval,
+      Timeout  => $timeout,
+      BindAddr => $bindaddr,
+      UseIPV6  => $ipv6,
     )->run();
   }
   
@@ -143,11 +163,16 @@ IRC::Indexer::Trawl::Multi - Trawl multiple IRC servers
       'eris.cobaltirc.org',
       'raider.blackcobalt.net',
       [ 'phoenix.xyloid.org', '7000' ],
+      {
+        Server => 'irc.netlandtowers.com',
+        Port   => 7000,
+        UseIPV6 => 1,
+        . . . 
+      },
       . . .
     ],
     
     ## For other opts, see: perldoc IRC::Indexer::Trawl::Bot
-    ## They will be passed to ::Bot unmolested.
   );
   
   $multi->run;
