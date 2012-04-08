@@ -43,21 +43,18 @@ GetOptions( $opts,
   /,
 );
 
+my $json = { };
+
 my $obj = {
   Log    => undef,
   Cfg    => undef,
-  HTTP   => undef,
-  Multi  => undef,
+  
+  ##  network -> server -> $obj
+  Trawlers => {},
 };
 
 my $state = { 
-  netinfo => {
-    ## hash keyed on network name
-    ## each network is a hash keyed on server name
-    ## containing Info::Server objects
-  },
-
-  timers => {},
+  timers => { trawlers => {} },
   stats  => {
     StartedAt => time,
     RunCount  => 0,
@@ -87,6 +84,7 @@ sub get_cfg {
     unless -r $opts->{config};
   
   my $conf = IRC::Indexer::Conf->new;
+  $obj->{Cfg} = $conf;
   my $cfhash;
   
   {
@@ -183,6 +181,7 @@ sub poco_init_session {
         _start
         _stop
         _timer_chk
+        _trawler_chk
       / ],
     ],
   );
@@ -193,6 +192,77 @@ sub poco_init_session {
 sub _timer_chk {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my $pool = $state->{timers};
+  
+  my @trawlers;
+
+  NETWORK: for my $network (keys %{$pool->{trawlers}}) {
+    my $this_net = $pool->{trawlers}->{$network};
+    SERVER: for my $server (keys %$this_net) {
+      my $this_server = $this_net->{$server};
+
+      ## FIXME configurable trawl interval
+      next SERVER unless time - $this_server->{LastRun} > 300;
+
+      my $this_trawler = $state->{Trawlers}->{$network}->{$server};
+      next SERVER unless blessed $this_trawler;
+
+      push(@trawlers, [ $this_trawler, $network, $server ]);
+      
+      $this_server->{LastRun} = time;
+    }
+  }
+  
+  $kernel->yield('_trawler_chk', @trawlers)
+    unless $heap->{TRAWLCHK_RUNNING};
+
+  $kernel->alarm('_timer_chk' => time + 3);
+}
+
+sub _trawler_chk {
+  ## event _trawler_chk(@trawler_objs ...)
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my (@remaining) = @_[ARG0 .. $#_];
+  my $idx = 0;
+  
+  $heap->{TRAWLCHK_RUNNING} = 1;
+  
+  ## check trawlers in a loop, 10 at a time
+  until (!@remaining || $idx == 10) {
+    my $item = shift @remaining;
+    my ($trawler, $network, $server) = @$item;
+    if ($trawler->done) {
+      log_to('irc', 'info', 
+        "handling completed trawler: $network ($server)"
+      );
+      
+      if (my $err = $trawler->failed) {
+        log_to('irc', 'warn',
+          "trawler reports failure: $network ($server): $err"
+        );
+        next
+      }
+      
+      ## feed to JSONify
+      my $js = IRC::Indexer::Output::JSON->new(
+        Input => $trawler->dump,
+      );
+      
+      ## save JSONified output
+      $json->{$network}->{$server} = $js->dump;
+      log_to('irc', 'debug',
+        "Cached JSON: $network ($server)"
+      );
+    }
+  }
+  
+  ## FIXME method/event to merge servers into networks
+  ## ::Network can do some of this ?
+  
+  if (@remaining) {
+    $kernel->yield('_trawler_chk', @remaining);
+  } else {
+    delete $heap->{TRAWLCHK_RUNNING};
+  }
 }
 
 sub _start {
@@ -207,7 +277,38 @@ sub _start {
   ## add states from $state->{handlers}
   $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};
   
-  ## FIXME init trawling
+  NETWORK: for my $network (keys %{ $state->{Networks} }) {
+    my $this_net = $state->{Networks}->{$network};
+    SERVER: for my $server (keys %$this_net) {
+      my $this_cf = $this_net->{$server};
+      
+      log_to('irc', 'debug', "New trawler: $network -> $server");
+      
+      my $trawler = IRC::Indexer::Trawl::Bot->new(
+        Server => $server,
+        Port   => $this_cf->{Port},
+        Nickname => $this_cf->{Nickname},
+        Timeout  => $this_cf->{Timeout},
+        Interval => $this_cf->{Interval},
+        BindAddr => $this_cf->{BindAddr},
+        UseIPV6  => $this_cf->{UseIPV6},
+      );
+      
+      $obj->{Trawlers}->{$network}->{$server} = $trawler;
+      
+      log_to('irc', 'debug', "Starting trawler for $server");
+      $trawler->run;
+      
+      ## FIXME add to check pool
+      $state->{timers}->{trawlers}->{$network}->{$server} = {
+        LastRun => 0,
+      };
+    }
+  }
+  
+  $kernel->alarm('_timer_chk' => time + 3);
+  
+  ## FIXME log number of trawlers spawned
 }
 
 sub _stop {}
