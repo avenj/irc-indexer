@@ -8,6 +8,7 @@ use Carp;
 
 use File::Find;
 
+use YAML::XS;
 
 sub new {
   my $self = {};
@@ -17,15 +18,49 @@ sub new {
 }
 
 sub parse_conf {
-
+  my ($self, $path) = @_;
+  
+  ## FIXME
+  ## try to load a YAML conf file
+  ## format for these may vary
 }
 
 sub parse_nets {
+  my ($self, $dir) = @_;
+  
+  my $nethash = {};
+  
+  my @specfiles = $self->find_nets($dir);
 
+  SERV: for my $specpath (@specfiles) {
+    ## FIXME
+    ## try to load YAML conf (parse_conf)
+    ## create conf hash keyed on network name
+    ## containing per-server configuration values
+  }
+
+  return $nethash;
 }
 
 sub find_nets {
-
+  my ($self, $dir) = @_;
+  
+  croak "find_nets called with no NetworkDir"
+    unless $dir;
+  
+  croak "find_nets called against non-directory $dir"
+    unless -d $dir;
+  
+  my @found;
+  find(
+    sub {
+      my $thisext = (split /\./)[-1] // return;
+      push(@found, $File::Find::name)
+        if $thisext eq 'server';
+    },
+    $dir
+  );
+  return @found;
 }
 
 sub slurp {
@@ -37,14 +72,30 @@ sub slurp {
   return $slurped
 }
 
-## Accessors
-
 
 ## Example CF
 
-sub example_cf {
-  ## write an example config
-  my ($path) = @_;
+sub example_cf_spec {
+  my $conf = <<END;
+---
+### Example server spec file
+
+Network: CobaltIRC
+Server: eris.oppresses.us
+Port: 6667
+# Defaults are probably fine here:
+#Nickname:
+#BindAddr:
+#UseIPV6:
+#Timeout: 90
+#Interval: 15
+
+END
+
+  return $conf
+}
+
+sub example_cf_multi {
   my $conf = <<END;
 ---
 ### Example ircindexer-multi config
@@ -96,6 +147,11 @@ OutputDir: /home/ircindex/trawled
 
 END
 
+  return $conf
+}
+
+sub write_example_cf {
+  my ($self, $path, $conf) = @_;
   open my $fh, '>', $path or die "open failed: $!\n";
   print $fh $conf;
   close $fh;
