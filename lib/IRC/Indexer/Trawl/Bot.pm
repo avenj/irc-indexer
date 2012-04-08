@@ -56,6 +56,7 @@ sub run {
       ## Internals / PoCo::IRC:
       qw/
          _start
+         _stop
          
          _check_timeout
          _retrieve_info
@@ -147,7 +148,7 @@ sub dump {
 
 
 ## POE (internal)
-
+sub _stop {}
 sub _start {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
 
