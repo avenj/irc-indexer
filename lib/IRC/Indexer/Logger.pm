@@ -18,10 +18,15 @@ sub new {
   
   my %args = @_;
   $args{lc $_} = delete $args{$_} for keys %args;
-  
-  $self->{LogFile} = $args{logfile}
-    || croak "No LogFile specified in new()";
-  
+
+  if ($args{devnull}) {
+    ## Sometimes it's useful to have a log object present,
+    ## but not necessarily logging anywhere:
+    $self->{DevNull} = 1;
+  } else { 
+    $self->{LogFile} = $args{logfile}
+      || croak "No LogFile specified in new()";
+  }  
   $self->{LogLevel} = $args{loglevel} || 'info' ;
   
   $self->logger( $self->_create_logger );
@@ -45,7 +50,7 @@ sub _create_logger {
       utf8     => 1,
       autoflush => 1,
     },
-  );
+  ) unless $self->{DevNull};
  
   return $logger
 }
