@@ -28,8 +28,46 @@ sub new {
   return $self
 }
 
+## Simple read-only accessors:
+
 sub dump {
-  ## FIXME
+  my ($self) = @_;
+  return $self->{Network}
+}
+
+sub servers {
+  my ($self) = @_;
+  return $self->{Network}->{Servers}
+}
+
+sub opers {
+  my ($self) = @_;
+  return $self->{Network}->{OperCount}
+}
+
+sub users {
+  my ($self) = @_;
+  return $self->{Network}->{GlobalUsers}
+}
+
+sub channels {
+  my ($self) = @_;
+  return $self->{Network}->{ListChans}
+}
+
+sub chanhash {
+  my ($self) = @_;
+  return $self->{Network}->{HashChans}
+}
+
+sub connectedat {
+  my ($self) = @_;
+  return $self->{Network}->{ConnectedAt}
+}
+
+sub finishedat {
+  my ($self) = @_;
+  return $self->{Network}->{FinishedAt}
 }
 
 sub add_server {
