@@ -76,6 +76,8 @@ POE::Session->create(
     
     check => sub {
       if ($trawl->done) {
+        my $info = $trawl->info;
+        $info->channels; ## builds sorted chan list
         my $ref = $trawl->dump;
         warn "Done\n";
 
