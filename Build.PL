@@ -28,6 +28,8 @@ my $build = Module::Build->new(
     'IRC::Utils' => 0,
     
     'POE::Component::IRC::State' => '6.74',
+
+    'POEx::HTTP::Server' => 0,
     
     'JSON::XS' => 0,
     'YAML::XS' => 0,

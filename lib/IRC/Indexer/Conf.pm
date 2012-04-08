@@ -12,7 +12,7 @@ use File::Find;
 sub new {
   my $self = {};
   my $class = shift;
-  bless $self, $class
+  bless $self, $class;
   return $self  
 }
 

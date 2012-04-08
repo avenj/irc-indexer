@@ -10,40 +10,69 @@ use IRC::Indexer::Conf;
 use IRC::Indexer::Logger;
 use IRC::Indexer::Output::JSON;
 
+use URI;
+
 use POEx::HTTP::Server;
+
+use Storable qw/dclone/;
 
 my $opts = {
   help => sub {
   
-  }
+  },
   
   version => sub {
   
-  }
+  },
   
   
 };
 use Getopt::Long;
 GetOptions( $opts,
   qw/
-    help version
+    help 
+    version
     
     port:8700
     
   /,
 );
 
-## Hash containing useful objects.
 my $obj = {
   Log    => undef,
   Cfg    => undef,
   HTTP   => undef,
   Multi  => undef,
 };
-my $state = { timers => {} };
+
+my $state = { 
+  networks => {
+    ## hash keyed on network name
+    ## each network is a hash keyed on server name
+    ## containing Info::Server objects
+  },
+
+  timers => {},
+  stats  => {
+    StartedAt => time,
+    RunCount  => 0,
+  },
+};
+
+my $cfg = { 
+  ## build out of network dirs:
+  NetworkList => [],
+  
+  Interval => 15,
+  Timeout  => 90,
+  
+  LogFile  => undef,
+  LogHTTP  => undef,
+  LogIRC   => undef,
+};
 
 sub get_cfg {
-
+  ## set up $cfg and logging
 }
 
 sub poco_cfg_httpd {
@@ -51,11 +80,16 @@ sub poco_cfg_httpd {
     '^/$' => 'poe:indexerhttp/h_root',
 
     '^/stats'   => 'poe:indexerhttp/h_stats', 
-    '^/server'  => 'poe:indexerhttp/h_server',
     '^/network' => 'poe:indexerhttp/h_network',
 
     '' => 'poe:indexerhttp/h_error_404',
   ];
+  
+  $state->{htevents} = [ map { 'h_'.$_ } qw/
+     root error_404
+     stats
+     server network
+  / ];
 
 
   POEx::HTTP::Server->spawn(
@@ -63,23 +97,21 @@ sub poco_cfg_httpd {
       LocalPort => $opts->{port},
     },
     
-    handlers => $state->{handlers},
+    handlers => dclone($state->{handlers}),
   );
   
-  my %handlers = @{$state->{handlers}};
-  return keys %handlers
+  return 1
 }
 
 sub poco_init_session {
   ## create 'indexerhttp' session
   POE::Session->create(
     package_states => [
-      main => [
-        _start,
-        _stop,
-        
-        _timer_chk,
-      ],
+      main => [ qw/
+        _start
+        _stop
+        _timer_chk
+      / ],
     ],
   );
 
@@ -98,7 +130,9 @@ sub _start {
   my @htstates = poco_cfg_httpd();
   
   ## add states from $state->{handlers}
-  $kernel->state($_, __PACKAGE__) for @{$state->{handlers}};
+  $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};
+  
+  ## FIXME init trawling
 }
 
 sub _stop {}
@@ -108,7 +142,7 @@ sub _stop {}
 sub h_error_404 {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($req, $resp) = @_[ARG0, ARG1];
-  $resp->error(404, "No action to take: ".$req->path);
+  $resp->error(404, "Undefined action: ".$req->uri);
 }
 
 sub h_root {
@@ -123,6 +157,7 @@ sub h_root {
    </body>
    </html>
   ");
+  $resp->respond;
   $resp->done;
 }
 
@@ -135,9 +170,11 @@ sub h_stats {
 
 sub h_server {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
-  my ($req, $resp) = @_[ARG0, ARG1];
-  ## handler for /server/...
+  my ($req, $resp)       = @_[ARG0, ARG1];
+  my ($network, $server) = @_[ARG2, ARG3];
+  ## handed off by h_network
   
+  $resp->respond;
   $resp->done;
 }
 
@@ -146,10 +183,45 @@ sub h_network {
   my ($req, $resp) = @_[ARG0, ARG1];
   ## handler for /network/...
 
+  my $uri = URI->new($req->uri);
+  my @chunks = $uri->path_segments;
+  splice @chunks, 0, 2;
+
+  ## if there's no network specified, 404
+  my ($network) = @chunks;
+  unless ($network) {
+    $kernel->yield( h_error_404 => $req, $resp );
+    return
+  }
+  
+  ## if this is a /network/<net>/server, hand it off
+  if ($chunks[1] && $chunks[1] eq "server") {
+    my $server = $chunks[2];
+    $kernel->yield( h_error_404 => $req, $resp )
+      unless $server;
+    $kernel->yield( h_server => $req, $resp, $network, $server );
+    return
+  }
+  
+  ## else, this should be a request for netinfo hash
+  ## FIXME handler for this
+  ## FIXME 404 if we don't know this network
+  ## FIXME set up JSON content 
+
+  $resp->respond;
   $resp->done;
 }
+
+poco_init_session();
+POE::Kernel->run;
 
 ## FIXME
 ##  get a specified conf and set up a logger
 ##  run Multi trawlers at intervals
 ##  serve JSON (from memory? berkdb as on-disk cache?)
+__END__
+
+=pod
+
+
+=cut
