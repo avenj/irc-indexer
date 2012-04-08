@@ -11,6 +11,7 @@ sub new {
   return $self
 }
 
+sub info { netinfo(@_) }
 sub netinfo {
   my ($self) = @_;
   ## Add ListChans before a netinfo dump:
@@ -120,6 +121,7 @@ sub channels {
   my ($self, $list) = @_;
   return $self->netinfo->{ListChans} = $chanlist
     if $chanlist and ref $chanlist eq 'ARRAY';
+  $self->_sort_listchans;
   return $self->netinfo->{ListChans}//[]
 }
 
@@ -162,5 +164,160 @@ __END__
 
 
 =pod
+
+=head1 NAME
+
+IRC::Indexer::Info::Server - Server information class for IRC::Indexer
+
+=head1 SYNOPSIS
+
+  my $info = IRC::Indexer::Info::Server->new;
+  
+  . . .
+  
+  my $ref = $info->netinfo;
+
+=head1 DESCRIPTION
+
+Represents the results of a single trawled server.
+
+=head2 Methods
+
+=head3 netinfo
+
+Returns the entire NetInfo hash, as documented below (L</netinfo hash>).
+
+=head3 status
+
+Get or set the current status.
+
+Valid values are:
+
+  undef     -- not started
+  INIT      -- started
+  CONNECTED -- connected to IRC
+  FAIL      -- error encountered
+  DONE      -- finished
+
+=head3 failed
+
+Get or set the current error string.
+
+Should be boolean false if there have been no fatal errors.
+
+=head3 startedat
+
+Get or set the start timestamp (epoch seconds)
+
+=head3 connectedat
+
+Get or set the time the trawler connected to IRC.
+
+=head3 finishedat
+
+Get or set the time the trawler finished this run.
+
+=head3 network
+
+Get or set the network name; this is the name announced via B<ISUPPORT> 
+(NETWORK=). If the queried network doesn't announce NETWORK=, the server 
+name will be supplied.
+
+=head3 connectedto 
+
+Get or set the target server; this is the address the bot is trawling, 
+not necessarily the announced server name (see L</server>)
+
+=head3 server
+
+Get or set the actual server name; this is the name announced by the 
+server, not necessarily the address we originally connected to.
+
+=head3 blank_motd
+
+Clear the existing MOTD.
+
+=head3 motd
+
+With no arguments, gets the current MOTD (or undef). This will be an 
+array reference containing MOTD lines.
+
+If an argument is specified, it is pushed to the end of the current MOTD 
+array.
+
+=head3 users
+
+Get or set the current global user count, as reported by B<LUSERS>.
+
+=head3 opers
+
+Get or set the current global oper count, as reported by B<LUSERS>.
+
+=head3 links
+
+With no arguments, returns an array reference containing LINKS output 
+(or undef).
+
+If an argument is specified, it should be an array reference containing 
+raw LINKS lines.
+
+=head3 channels
+
+Returns an array of arrays, sorted by user count (highest first), of 
+channel names and their respective user counts and topics:
+
+  my $listchans = $info->channels;
+  for my $item (@$listchans) {
+    my ($name, $count, $topic) = @$item;
+    . . .
+  }
+
+=head3 chanhash
+
+Returns a hash, keyed on channel name, of the results of B<LIST>.
+
+Keys are B<Users> and B<Topic>:
+
+  my $chans = $info->chanhash;
+  for my $channel (keys %$chans) {
+    my $this_chan = $chans->{$channel};
+    my $user_count = $this_chan->{Users};
+    my $last_topic = $this_chan->{Topic};
+    . . . 
+  }
+
+=head3 add_channel
+
+Used internally by trawlers.
+
+Adds a channel to the channel hash (see L</chanhash>):
+
+  ## in a LIST handler:
+  $info->add_channel($chan, $users, $topic);
+
+=head2 netinfo hash
+
+The B<netinfo> method returns a hash with the following keys:
+
+  Status
+  Failure
+  ConnectedTo
+  ServerName
+  NetName
+  GlobalUsers
+  OperCount
+  ListLinks
+  ListChans
+  MOTD
+  StartedAt
+  ConnectedAt
+  FinishedAt
+
+These all roughly correspond to their respective accessors, documented 
+above.
+
+=head1 AUTHOR
+
+Jon Portnoy <avenj@cobaltirc.org>
 
 =cut
