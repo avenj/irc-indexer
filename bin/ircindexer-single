@@ -11,7 +11,7 @@ use IRC::Indexer::Output::JSON;
 use IRC::Indexer::Output::YAML;
 use IRC::Indexer::Output::Dumper;
 
-my($server, $verbose);
+my($server, $verbose, $outpath);
 my $fmt = 'STDOUT';
 
 use Getopt::Long;
@@ -24,6 +24,8 @@ GetOptions(
   'server=s' => \$server,
 
   'verbose:0' => \$verbose,
+  
+  'output=s'  => \$outpath,
   
   'format|export=s' => \$fmt,
   
@@ -52,28 +54,34 @@ POE::Session->create(
         my $ref = $trawl->dump;
         warn "Done\n";
 
+        my $output;
         given ($fmt) {
           when ("JSON") {
-            my $output = IRC::Indexer::Output::JSON->new(
+            $output = IRC::Indexer::Output::JSON->new(
               Input => $ref,
             );
-            print $output->dump;
           }
           
           when ("YAML") {
-            my $output = IRC::Indexer::Output::YAML->new(
+            $output = IRC::Indexer::Output::YAML->new(
               Input => $ref,
             );
-            print $output->dump;
           }
           
           default {
-            my $output = IRC::Indexer::Output::Dumper->new(
+            $output = IRC::Indexer::Output::Dumper->new(
               Input => $ref,
             );
-            print $output->dump;          
           }
         }
+        
+        if ($outpath) {
+          warn "Attempting to write: $outpath\n";
+          $output->write($outpath);
+        } else {
+          print $output->dump;
+        }
+        
         $_[KERNEL]->stop;
         exit 0
       } else {
@@ -98,7 +106,7 @@ ircindexer-single - Trawl a single server for network information
 
   ircindexer-single --help
   
-  ircindexer-single -f JSON -s irc.cobaltirc.org > cobaltirc.out
+  ircindexer-single -f JSON -s irc.cobaltirc.org -o cobaltirc.out
   
 =head1 DESCRIPTION
 
