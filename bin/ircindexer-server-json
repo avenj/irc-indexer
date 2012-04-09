@@ -84,6 +84,8 @@ GetOptions( $opts,
 
 my $json = { };
 
+## These are set up here for ease of reference:
+
 my $obj = {
   Log    => undef,
   Cfg    => undef,
@@ -116,6 +118,7 @@ my $state = {
 
 my $cfg = { 
   Networks => {},
+  BindAddr   => '0.0.0.0',
   ServerPort => 8700,
   
   LogFile  => undef,
@@ -239,6 +242,7 @@ sub poco_cfg_httpd {
 
   POEx::HTTP::Server->spawn(
     inet => {
+      LocalAddr => $cfg->{BindAddr},
       LocalPort => $cfg->{ServerPort},
     },
     
@@ -850,6 +854,8 @@ Network information hashes are exported via B</network/> routes:
   ## JSON array of available trawled networks:
   http://my.server:8700/network
 
+These are indexed by their configured network name.
+
 =head3 Servers
 
 Specific server hashes as described in L<IRC::Indexer::Trawl::Bot> are 
@@ -860,6 +866,13 @@ exported via /network/<NETNAME>/server/<SERVERNAME>:
 
   ## Trawl results from a single server:
   http://my.server:8700/network/CobaltIRC/server/eris.oppresses.us
+
+Note that servers are not available for retrieval until they are 
+trawled; depending on trawl intervals, it may take some time to cycle 
+through all listed servers for a network.
+
+Also note that servers are indexed by their reported server name -- not 
+necessarily the name specified in their configuration.
 
 =head3 Stats
 

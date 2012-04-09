@@ -140,6 +140,11 @@ NetworkDir: /home/ircindex/networks
 ## Port to run this HTTPD instance on.
 ServerPort: 8700
 
+## BindAddr:
+##
+## Optional address to bind to.
+#BindAddr: '0.0.0.0'
+
 ## LogFile:
 ##
 ## Path to log file.
