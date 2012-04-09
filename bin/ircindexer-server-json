@@ -97,10 +97,20 @@ my $obj = {
 my $state = { 
   timers => { trawlers => {} },
   stats  => {
+    Version => $IRC::Indexer::VERSION,
     StartedAt => time,
+    
+    LoopTick      => 0,
     
     TotalNetworks => 0,
     TotalServers  => 0,
+    
+    TrawlersExecuted => 0,
+    TrawlersCreated  => 0,
+    
+    LastTrawl        => 0,
+    
+    HTTP_Responses   => 0,
   },
 };
 
@@ -170,7 +180,7 @@ sub get_cfg {
           log_to   => "STDOUT",
           maxlevel => $loglevel || 'info',
           timeformat     => "%Y/%m/%d %H:%M:%S",
-          message_layout => "[%T] %L (%p) %m",
+          message_layout => "[%T] %L %m",
       },
     );
 
@@ -218,11 +228,13 @@ sub poco_cfg_httpd {
      error_404
      src
      stats
+     list
      server 
      servlist
      network
      netlist
   / ];
+  push(@{$state->{htevents}}, 'post_request');
 
 
   POEx::HTTP::Server->spawn(
@@ -231,12 +243,19 @@ sub poco_cfg_httpd {
     },
     
     handlers => [
-      '^/stats'   => 'poe:indexerhttp/h_stats', 
+      '^/$'       => 'poe:indexerhttp/h_stats',
+      '^/stats'   => 'poe:indexerhttp/h_stats',
+       
+      '^/list'    => 'poe:indexerhttp/h_list',
+       
       '^/network' => 'poe:indexerhttp/h_network',
       '^/netlist' => 'poe:indexerhttp/h_netlist',
+      
       '^/src'     => 'poe:indexerhttp/h_src',
-
+      
       '' => 'poe:indexerhttp/h_error_404',
+      
+      'post_request' => 'poe:indexerhttp/post_request',
     ],
   );
   
@@ -322,7 +341,7 @@ sub _trawler_process {
   
   my $this_trawler_cf = $cfg->{Networks}->{$network}->{$server};
   unless (defined $this_trawler_cf) {
-    log_to('session', 'warn', 
+    log_to('irc', 'warn', 
       "Cannot readd trawler: missing conf: $network: $server"
     );
     return
@@ -345,6 +364,8 @@ sub _trawler_process {
 sub _timer_chk {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my $pool = $state->{timers};
+
+  ++$state->{stats}->{LoopTick};
   
   my @trawlers;
 
@@ -422,6 +443,9 @@ sub _trawler_run {
   my $server = $trawler->info->connectedto;
   log_to('irc', 'debug', "Trawler run issued for $server");
   $trawler->run;
+
+  ++$state->{stats}->{TrawlersExecuted};
+  $state->{stats}->{LastTrawl} = time;
 }
 
 sub create_trawler {
@@ -436,6 +460,9 @@ sub create_trawler {
     BindAddr => $this_cf->{BindAddr},
     UseIPV6  => $this_cf->{UseIPV6},
   );
+  
+  ++$state->{stats}->{TrawlersCreated};
+  
   return $trawler
 }
 
@@ -443,7 +470,7 @@ sub _start {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   $kernel->alias_set('indexerhttp');
 
-  log_to('session', 'debug', 'Session started');
+  log_to('session', 'info', 'Session started');
 
   ## init httpd
   my @htstates = poco_cfg_httpd();
@@ -502,7 +529,7 @@ sub h_error_404 {
   
   log_to('http', 'info', "$addr 404 $path");
   
-  $reason = "Undefined action: $req->uri" unless $reason;
+  $reason = "Undefined action: ".$req->uri unless $reason;
   $resp->error(404, $reason);
 }
 
@@ -543,10 +570,9 @@ sub h_stats {
   my ($method) = @chunks;
   $method = 'json' unless $method;
   
-  my $n_count = $state->{stats}->{TotalNetworks};
-  my $s_count = $state->{stats}->{TotalServers};
-  
   if ($method eq 'text' || $method eq 'plain') {
+    my $n_count = $state->{stats}->{TotalNetworks};
+    my $s_count = $state->{stats}->{TotalServers};
     $resp->content_type('text/plain');
     $resp->content(
         "Trawling $s_count servers across $n_count networks\n\n"
@@ -554,10 +580,7 @@ sub h_stats {
     );
   } else {
     $resp->content_type('application/json');
-    my $ref = {
-      Networks => $n_count,
-      Servers  => $s_count,
-    };
+    my $ref = $state->{stats};
     my $json = JSON::XS->new->utf8(1)->pretty->encode($ref);
     $resp->content($json);
   }
@@ -582,13 +605,17 @@ sub h_server {
     exists $json->{Servers}->{$network} 
     && defined $json->{Servers}->{$network}->{$server}
   ) {
+    
     ## no JSON for this server, 404
     my $reason;
+    
     if (defined $cfg->{Networks}->{$network}
         && defined $cfg->{Networks}->{$network}->{$server}
     ) {
       ## configured but not trawled (yet)
       $reason = "$server ($network) pending trawler run";
+    } else {
+      $reason = "No such server";
     }
 
     $kernel->yield( h_error_404 => $req, $resp, $reason );
@@ -656,6 +683,29 @@ sub h_netlist {
   $resp->done;
 }
 
+sub h_list {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($req, $resp) = @_[ARG0, ARG1];
+
+  ## Return all configured networks/servers
+
+  my $jsify = IRC::Indexer::Output::JSON->new(
+    Input => $cfg->{Networks},
+  );
+  my $json = $jsify->dump;
+  
+  $resp->content_type('application/json');
+  $resp->content($json);
+  
+  $resp->respond;
+
+  my $conn = $req->connection;
+  my $addr = $conn->remote_host;
+  log_to('http', 'info', "$addr 200 h_list");
+  
+  $resp->done;
+}
+
 sub h_network {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($req, $resp) = @_[ARG0, ARG1];
@@ -678,6 +728,8 @@ sub h_network {
     if (defined $cfg->{Networks}->{$network}) {
       ## configured but not trawled
       $reason = "$network pending trawler run";
+    } else {
+      $reason = "No such network";
     }
     $kernel->yield( h_error_404 => $req, $resp, $reason );
     return
@@ -709,6 +761,11 @@ sub h_network {
   log_to('http', 'info', "$addr 200 h_network $network");
   $resp->done;
 }
+
+sub post_request {
+  ++$state->{stats}->{HTTP_Responses};
+}
+
 
 sub start_indexer {
   if ($opts->{detach}) {
@@ -746,11 +803,13 @@ ircindexer-server-json - Serve IRC::Indexer JSON over HTTP
 
   ## Create example httpd.cf:
   $ ircindexer-examplecf -t httpd -o httpd.cf
+  $ $EDITOR httpd.cf
 
   ## Add some servers:
   $ mkdir -p networks/cobaltirc
   $ ircindexer-examplecf -t spec -o \
       networks/cobaltirc/phoenix.xyloid.org
+  $ $EDITOR networks/cobaltirc/phoenix.xyloid.org
 
   ## Start server:
   $ ircindexer-server-json -c httpd.cf
@@ -758,9 +817,21 @@ ircindexer-server-json - Serve IRC::Indexer JSON over HTTP
 =head1 DESCRIPTION
 
 Indexes sets of servers in parallel via L<IRC::Indexer>, exporting 
-information to JSON via HTTP for ease of retrieval.
+information as JSON via HTTP for ease of retrieval.
 
 =head2 Fetching JSON
+
+Networks or servers that are configured but not yet trawled will report 
+a 404 error with a string indicating that the trawl run is pending.
+
+=head3 List
+
+A hash containing networks and servers scheduled for trawling is 
+available via B</list>:
+
+  ## JSON hash containing network -> server mapping of
+  ## configured trawlers:
+  http://my.server:8700/list
 
 =head3 Networks
 
@@ -782,5 +853,17 @@ exported via /network/<NETNAME>/server/<SERVERNAME>:
 
   ## Trawl results from a single server:
   http://my.server:8700/network/CobaltIRC/server/eris.oppresses.us
+
+=head3 Stats
+
+Stats regarding the running instance are exported via B</stats>:
+
+  http://my.server:8700/stats
+
+=head1 AUTHOR
+
+Jon Portnoy <avenj@cobaltirc.org>
+
+L<http://www.cobaltirc.org>
 
 =cut
