@@ -14,6 +14,10 @@ trawler output to use.
 L<ircindexer-server-json> can be used to manage a set of trawlers, 
 exporting JSON over HTTP for use by frontends.
 
+Note that server-json only reports networks & servers that have been 
+trawled in the current instance. It is up to frontends to handle 
+persistency and storage.
+
 Assuming your ircindexer-server-json is running on port 8700 on 
 localhost:
 
@@ -32,7 +36,8 @@ localhost:
     
     $networks = decode_json($json);
   } else {
-    ## die, or something
+    ## Retrieving JSON failed ...
+    ## die() with $response->status_line, or something
   }
   
 Now $networks contains an array reference listing available network 

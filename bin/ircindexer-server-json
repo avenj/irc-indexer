@@ -3,6 +3,8 @@ use 5.12.1;
 use strict;
 use warnings;
 
+## FIXME optional on-disk cache / persistency
+
 ## Core:
 use POSIX ();
 use Scalar::Util qw/blessed/;
@@ -491,8 +493,8 @@ sub _stop {}
 
 sub h_error_404 {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
-  my ($req, $resp) = @_[ARG0, ARG1];
-  
+  my ($req, $resp, $reason) = @_[ARG0, ARG1, ARG2];
+    
   my $uri  = URI->new( $req->uri );
   my $path = $uri->path;
   my $conn = $req->connection;
@@ -500,7 +502,8 @@ sub h_error_404 {
   
   log_to('http', 'info', "$addr 404 $path");
   
-  $resp->error(404, "Undefined action: ".$req->uri);
+  $reason = "Undefined action: $req->uri" unless $reason;
+  $resp->error(404, $reason);
 }
 
 sub h_src {
@@ -580,7 +583,15 @@ sub h_server {
     && defined $json->{Servers}->{$network}->{$server}
   ) {
     ## no JSON for this server, 404
-    $kernel->yield( h_error_404 => $req, $resp );
+    my $reason;
+    if (defined $cfg->{Networks}->{$network}
+        && defined $cfg->{Networks}->{$network}->{$server}
+    ) {
+      ## configured but not trawled (yet)
+      $reason = "$server ($network) pending trawler run";
+    }
+
+    $kernel->yield( h_error_404 => $req, $resp, $reason );
     return
   }
 
@@ -663,7 +674,12 @@ sub h_network {
 
   ## We don't know this network:
   unless (defined $json->{Networks}->{$network}) {
-    $kernel->yield( h_error_404 => $req, $resp );
+    my $reason;
+    if (defined $cfg->{Networks}->{$network}) {
+      ## configured but not trawled
+      $reason = "$network pending trawler run";
+    }
+    $kernel->yield( h_error_404 => $req, $resp, $reason );
     return
   }
     
