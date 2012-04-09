@@ -537,5 +537,42 @@ __END__
 
 =pod
 
+=head1 NAME
+
+ircindexer-server-json - Serve IRC::Indexer JSON over HTTP
+
+=head1 SYNOPSIS
+
+  ## Create example httpd.cf:
+  $ ircindexer-examplecf -t httpd -o httpd.cf
+
+  ## Add some servers:
+  $ mkdir -p networks/cobaltirc
+  $ ircindexer-examplecf -t spec -o \
+      networks/cobaltirc/phoenix.xyloid.org
+
+  ## Start server:
+  $ ircindexer-server-json -c httpd.cf
+
+=head1 DESCRIPTION
+
+Indexes sets of servers in parallel via L<IRC::Indexer>, exporting 
+information to JSON via HTTP for ease of retrieval.
+
+=head2 Fetching JSON
+
+=head3 Networks
+
+Network information hashes are exported via B</network/> routes:
+
+  ## JSON Network Info hash for 'CobaltIRC':
+  http://my.server:9200/network/CobaltIRC
+
+=head3 Servers
+
+Specific server hashes as described in L<IRC::Indexer::Trawl::Bot> are 
+exported via /network/<NETNAME>/server/<SERVERNAME>:
+
+  http://my.server:9200/network/CobaltIRC/server/eris.oppresses.us
 
 =cut
