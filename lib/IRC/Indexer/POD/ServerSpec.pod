@@ -31,8 +31,8 @@ and "HASH" to refer to an associative key=>value mapping. In Perl these
 data structures deserialize to an array reference and a hash reference 
 respectively.
 
-The term I</undef> will be used to refer to what some languages call 
-I</null>.
+The term I<undef> will be used to refer to what some languages call 
+I<null>.
 
 =head1 HASH KEYS
 

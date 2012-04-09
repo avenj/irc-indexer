@@ -10,7 +10,7 @@ __END__
 
 =head1 NAME
 
-IRC::Indexer - IRC server indexing via POE
+IRC::Indexer - IRC server stats collection via POE
 
 =head1 SYNOPSIS
 
@@ -42,6 +42,9 @@ B<ircindexer-server-json>.
 
 See the B<perldoc> for L<IRC::Indexer::Trawl::Bot> for more about 
 using the trawl bot itself as part of other POE-enabled applications.
+
+See L<IRC::Indexer::POD::ServerSpec> and 
+L<IRC::Indexer::POD::NetworkSpec> for details on exported data.
 
 =head1 AUTHOR
 
