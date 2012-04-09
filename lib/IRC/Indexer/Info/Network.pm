@@ -5,6 +5,8 @@ use strict;
 use warnings;
 use Carp;
 
+## FIXME add LINKS
+
 use Scalar::Util qw/blessed/;
 
 sub new {
@@ -100,6 +102,7 @@ sub add_server {
   $network->{HashChans}   = $info->chanhash;
   $network->{ConnectedAt} = $info->connectedat;
   $network->{FinishedAt}  = $info->finishedat;
+  $network->{ListLinks}   = $info->links;
 }
 
 1;
