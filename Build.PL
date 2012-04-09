@@ -22,8 +22,15 @@ my $build = Module::Build->new(
     'perl' => '5.12.1',
     'Data::Dumper' => 0,
     'Getopt::Long' => 0,
+    'POSIX'        => 0,
     'Scalar::Util' => 0,
     'Storable'     => 0,
+
+   ## POE
+    'POE' => '1.311',
+    
+   ## Logging
+    'Log::Handler' => 0,
 
    ## IRC
     'IRC::Utils' => 0,

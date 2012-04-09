@@ -3,6 +3,8 @@ use 5.12.1;
 use strict;
 use warnings;
 
+use POSIX ();
+
 use POE;
 
 use IRC::Indexer;
@@ -30,19 +32,36 @@ my $opts = {
     print(
       "ircindexer-server-json\n\n",
       
+      "  -v, --version\n",
+      "       Display IRC::Indexer version\n\n",
+      
       "  -c, --config=PATH\n",
       "       Configuration file for this server.\n\n",
       
+      "  -d, --detach\n",
+      "       Run as a daemon process.\n\n",
+      
+      "  -i, --interval=SECS\n",
+      "       Interval between trawling servers on a specific network.\n",
+      "       Defaults to 600 seconds (10 minutes)\n",
     );
     exit 0
   },
   
   version => sub {
-  
+    print(
+      "ircindexer-server-json (IRC::Indexer $IRC::Indexer::VERSION)\n",
+      "  POEx::HTTP::Server $POEx::HTTP::Server::VERSION\n",
+    );
+    exit 0
   },
   
+  detach => 0,
+  
+  interval => 600,
   
 };
+
 use Getopt::Long;
 GetOptions( $opts,
   qw/
@@ -51,10 +70,11 @@ GetOptions( $opts,
     
     config=s
     
-    loglevel=s
+    detach!
+
+    interval=i
     
     showsource
-    
   /,
 );
 
@@ -205,6 +225,7 @@ sub poco_init_session {
         _stop
         _timer_chk
         _trawler_chk
+        _trawler_run
       / ],
     ],
   );
@@ -223,26 +244,26 @@ sub _timer_chk {
     SERVER: for my $server (keys %$this_net) {
       my $this_server = $this_net->{$server};
 
-      if (time - $this_server->{LastRun} > 600) {
+      if ($this_server->{LastRun} && 
+        time - $this_server->{LastRun} > 600) {
         ## FIXME configurable interval
         ## 10 minutes passed, create a new trawler
         my $this_cf = $cfg->{Networks}->{$network}->{$server};
         my %trawlopts = %$this_cf;
         my $trawler = create_trawler(Server => $server, %trawlopts);
         $obj->{Trawlers}->{$network}->{$server} = $trawler;
-        log_to('irc', 'debug', "Starting trawler for $server");
-        ## FIXME: space out runs() for servers on the same network
-        ##  or just have per-network trawlers and swap them out for diff
-        ##  server
-        $trawler->run;
-        $this_server->{LastRun} = time;
+        log_to('irc', 'debug', "Re-initialized trawler for $server");
+        ## schedule a run event for this trawler
+        ## FIXME: configurable delay
+        $kernel->alarm_add('_trawler_run', time + 600, $trawler);
+        $this_server->{LastRun} = time + 600;
       }
 
       my $this_trawler = $obj->{Trawlers}->{$network}->{$server};
 
       next SERVER unless blessed $this_trawler;
 
-      log_to('irc', 'debug', "Checking trawler: $network: $server");
+      $this_server->{LastRun} = time;
 
       push(@trawlers, [ $this_trawler, $network, $server ]);
     }
@@ -252,6 +273,12 @@ sub _timer_chk {
     unless $heap->{TRAWLCHK_RUNNING};
 
   $kernel->alarm('_timer_chk' => time + 3);
+}
+
+sub _trawler_run {
+  my ($kernel, $heap, $trawler) = @_[KERNEL, HEAP];
+  return unless blessed $trawler;
+  $trawler->run;
 }
 
 sub _trawler_chk {
@@ -267,6 +294,7 @@ sub _trawler_chk {
     ++$idx;
     my $item = shift @remaining;
     my ($trawler, $network, $server) = @$item;
+#    log_to('irc', 'debug', "Checking trawler: $network: $server");
     if ($trawler->done) {
       log_to('irc', 'info', 
         "handling completed trawler: $network ($server)"
@@ -351,6 +379,7 @@ sub _start {
   NETWORK: for my $network (keys %{ $cfg->{Networks} }) {
     ++$total_nets;
     my $this_net = $cfg->{Networks}->{$network};
+    my $sc_count = 0;
     SERVER: for my $server (keys %$this_net) {
       ++$total_servers;
       my $this_cf = $this_net->{$server};
@@ -363,12 +392,21 @@ sub _start {
       $obj->{Trawlers}->{$network}->{$server} = $trawler;
       
       log_to('irc', 'debug', "Starting trawler for $server");
-      $trawler->run;
+      
+      ## schedule a run event for this trawler
+      if ($sc_count) {
+        $kernel->alarm_add('_trawler_run', time + $sc_count, $trawler);
+      } else {
+        $trawler->run;
+      }
 
       ## add to chk pool      
       $state->{timers}->{trawlers}->{$network}->{$server} = {
         LastRun => 0,
       };
+      
+      ## FIXME: configurable
+      $sc_count += 600;
     }
   }
   
@@ -542,9 +580,29 @@ sub h_network {
   $resp->done;
 }
 
-get_cfg();
-poco_init_session();
-POE::Kernel->run;
+sub start_indexer {
+  if ($opts->{detach}) {
+    print "Starting detached indexer.\n";
+    
+    my $fork = fork;
+    exit 1 if not defined $fork;
+    exit 0 if $fork;
+    POSIX::setsid();
+    $fork = fork;
+    exit 1 if not defined $fork;
+    exit 0 if $fork;
+    open(STDIN, '<', '/dev/null');
+    open(STDOUT, '>>', '/dev/null');
+    open(STDERR, '>>', '/dev/null');
+    umask(022);
+  }
+
+  get_cfg();
+  poco_init_session();
+  POE::Kernel->run;
+}
+
+start_indexer();
 
 __END__
 
