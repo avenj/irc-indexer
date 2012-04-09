@@ -1,6 +1,5 @@
 bin/ircindexer-examplecf
 bin/ircindexer-single
-bin/ircindexer-multi
 bin/ircindexer-server-json
 Build.PL
 lib/IRC/Indexer.pm

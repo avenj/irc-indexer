@@ -5,6 +5,8 @@ use warnings;
 
 ## FIXME optional on-disk cache / persistency
 
+use Proc::PID::File;
+
 ## Core:
 use POSIX ();
 use Scalar::Util qw/blessed/;
@@ -829,6 +831,11 @@ ircindexer-server-json - Serve IRC::Indexer JSON over HTTP
 
 Indexes sets of servers in parallel via L<IRC::Indexer>, exporting 
 information as JSON via HTTP for ease of retrieval.
+
+Uses L<POEx::HTTP::Server> to provide HTTP daemon functionality.
+
+See L<IRC::Indexer::POD::ExampleClients> for some examples of ways to 
+make use of the exported data on the client side.
 
 =head2 Fetching JSON
 

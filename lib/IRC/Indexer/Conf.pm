@@ -174,61 +174,6 @@ END
   return $conf
 }
 
-sub example_cf_multi {
-  my $conf = <<END;
----
-### Example ircindexer-multi config
-
-## NetworkDir:
-##
-## Network spec files will be found recursively under NetworkDir:
-## A network spec file should end in ".server"
-## These specs tie networks together under their specified Network:
-## The files should be YAML, looking something like:
-#   ---
-#   Network: CobaltIRC
-#   Server: eris.oppresses.us
-#   Port: 6667
-#   Timeout: 90
-#   Interval: 15
-##
-NetworkDir: /home/ircindex/networks
-
-## LogFile:
-##
-## An optional action log.
-LogFile: /home/ircindex/indexer.log
-
-## Format:
-##
-## The output subclass to use. One of: JSON, YAML, Dumper
-Format: YAML
-
-## OutputType:
-##
-## One of: Network, Server, All
-## Determines how flatfile output will be saved.
-##
-## If OutputType is 'Network', servers belonging to a particular
-## network name are consolidated into one file per network.
-##
-## If OutputType is 'Server', output is split into one file per
-## server.
-##
-## If OutputType is 'All', output is saved to one giant file
-## covering all networks trawled.
-OutputType: Network
-
-## OutputDir:
-##
-## Destination for output files; must be a directory.
-OutputDir: /home/ircindex/trawled
-
-END
-
-  return $conf
-}
-
 sub get_example_conf { get_example_cf(@_) }
 sub get_example_cf {
   my ($self, $cftype) = @_;

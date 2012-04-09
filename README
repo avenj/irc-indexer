@@ -1,5 +1,5 @@
 NAME
-    IRC::Indexer - IRC server indexing via POE
+    IRC::Indexer - IRC server stats collection via POE
 
 SYNOPSIS
       ## Pull stats from a single server:
@@ -30,6 +30,11 @@ DESCRIPTION
     See the perldoc for IRC::Indexer::Trawl::Bot for more about using the
     trawl bot itself as part of other POE-enabled applications.
 
+    See IRC::Indexer::POD::ServerSpec and IRC::Indexer::POD::NetworkSpec for
+    details on exported data.
+
 AUTHOR
     Jon Portnoy <avenj@cobaltirc.org>
+
+    http://www.cobaltirc.org
 
