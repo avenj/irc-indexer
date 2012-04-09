@@ -53,6 +53,8 @@ GetOptions( $opts,
     
     loglevel=s
     
+    showsource
+    
   /,
 );
 
@@ -168,8 +170,10 @@ sub poco_cfg_httpd {
   
   $state->{htevents} = [ map { 'h_'.$_ } qw/
      error_404
+     src
      stats
-     server network
+     server 
+     network
   / ];
 
 
@@ -181,6 +185,7 @@ sub poco_cfg_httpd {
     handlers => [
       '^/stats'   => 'poe:indexerhttp/h_stats', 
       '^/network' => 'poe:indexerhttp/h_network',
+      '^/src'     => 'poe:indexerhttp/h_src',
 
       '' => 'poe:indexerhttp/h_error_404',
     ],
@@ -226,6 +231,9 @@ sub _timer_chk {
         my $trawler = create_trawler(Server => $server, %trawlopts);
         $obj->{Trawlers}->{$network}->{$server} = $trawler;
         log_to('irc', 'debug', "Starting trawler for $server");
+        ## FIXME: space out runs() for servers on the same network
+        ##  or just have per-network trawlers and swap them out for diff
+        ##  server
         $trawler->run;
         $this_server->{LastRun} = time;
       }
@@ -367,7 +375,7 @@ sub _start {
   $kernel->alarm('_timer_chk' => time + 3);
 
   log_to('irc', 'info',
-    "Trawling $total_servers across $total_nets"
+    "Trawling $total_servers servers across $total_nets networks"
   );
 
   $state->{stats}->{TotalNetworks} = $total_nets;
@@ -390,6 +398,32 @@ sub h_error_404 {
   log_to('http', 'info', "$addr 404 $path");
   
   $resp->error(404, "Undefined action: ".$req->uri);
+}
+
+sub h_src {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($req, $resp) = @_[ARG0, ARG1];
+  
+  unless ($opts->{showsource}) {
+    $kernel->yield( h_error_404 => $req, $resp );
+    return
+  }
+
+  my $src;
+  seek(DATA, 0, 0);
+  {
+    local $/; $src = <DATA>;
+  }
+
+  $resp->content_type('text/plain');
+  $resp->content($src);
+  $resp->respond;
+
+  my $conn = $req->connection;
+  my $addr = $conn->remote_host;
+  log_to('http', 'info', "$addr 200 h_src");
+  
+  $resp->done;
 }
 
 sub h_stats {

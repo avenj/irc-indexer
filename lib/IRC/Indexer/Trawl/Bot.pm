@@ -1,5 +1,4 @@
 package IRC::Indexer::Trawl::Bot;
-our $VERSION = '0.01';
 
 ## feed me a server / port to connect to
 ## connect to the server / port
@@ -12,6 +11,8 @@ use 5.12.1;
 use strict;
 use warnings;
 use Carp;
+
+use IRC::Indexer;
 
 use IRC::Indexer::Info::Server;
 
@@ -174,7 +175,7 @@ sub _start {
   
   $irc->plugin_add('CTCP' =>
     POE::Component::IRC::Plugin::CTCP->new(
-      version => __PACKAGE__.' '.$VERSION,
+      version => __PACKAGE__.' '.$IRC::Indexer::VERSION,
     ),
   );
   

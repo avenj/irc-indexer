@@ -1,5 +1,4 @@
 package IRC::Indexer::Logger;
-our $VERSION = '0.01';
 
 use 5.12.1;
 use strict;

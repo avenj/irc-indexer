@@ -1,5 +1,4 @@
 package IRC::Indexer::Output::JSON;
-our $VERSION = '0.01';
 
 use strict;
 use warnings;
