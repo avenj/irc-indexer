@@ -2,14 +2,30 @@ NAME
     IRC::Indexer - IRC server indexing via POE
 
 SYNOPSIS
-    FIXME
+      ## Pull stats from a single server:
+      $ ircindexer-single -s irc.cobaltirc.org -f JSON -o cobaltirc.json
+
+      ## Generate some example confs:
+      $ ircindexer-examplecf -t httpd -o httpd.cf
+      $ $EDITOR httpd.cf
+
+      $ mkdir networks/
+      $ cd networks/
+      $ mkdir cobaltirc
+      $ ircindexer-examplecf -t spec -o cobaltirc/eris.oppresses.us.server
+      $ $EDITOR cobaltirc/eris.oppresses.us.server
+      . . .
+  
+      ## Spawn a httpd serving JSON:
+      $ ircindexer-server-json -c httpd.cf
 
 DESCRIPTION
     A set of modules and utilities useful for trawling IRC networks,
     collecting information, and exporting it to portable formats for use in
     Web frontends and other applications.
 
-    FIXME frontends
+    As of this writing, known-working frontends are ircindexer-single and
+    ircindexer-server-json.
 
     See the perldoc for IRC::Indexer::Trawl::Bot for more about using the
     trawl bot itself as part of other POE-enabled applications.

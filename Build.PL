@@ -25,12 +25,15 @@ my $build = Module::Build->new(
     'Scalar::Util' => 0,
     'Storable'     => 0,
 
+   ## IRC
     'IRC::Utils' => 0,
-    
     'POE::Component::IRC::State' => '6.74',
 
-    'POEx::HTTP::Server' => 0,
-    
+   ## HTTP
+    'URI' => 0,
+    'POEx::HTTP::Server' => 0,    
+   
+   ## Serialization
     'JSON::XS' => 0,
     'YAML::XS' => 0,
   },
