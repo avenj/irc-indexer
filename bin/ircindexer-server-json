@@ -278,6 +278,7 @@ sub poco_init_session {
         _timer_chk
         _trawler_run
         _trawler_process
+        _cache_json
       / ],
     ],
   );
@@ -312,37 +313,29 @@ sub _trawler_process {
   
   ## sort ListChans:
   $trawler->info->channels;
-  
+
   ## feed to JSONify
-  my $js = IRC::Indexer::Output::JSON->new(
+  my $s_js = IRC::Indexer::Output::JSON->new(
     Input => $trawler->dump,
   );
-  
-  ## cache JSONified output
-  $json->{Servers}->{$network}->{$server} = $js->dump;
-  log_to('irc', 'info',
-    "Cached JSON: $network ($server)"
-  );
-  
+
   ## create an Info::Network if we don't have one
   $obj->{NetInfo}->{$network} = IRC::Indexer::Info::Network->new()
     unless blessed $obj->{NetInfo}->{$network};
   
   ## feed it this server's Info object:
   $obj->{NetInfo}->{$network}->add_server($trawler->info);
-  
-  ## cache or refresh JSON for that, too:
+
   my $ref = $obj->{NetInfo}->{$network}->dump;
   my $n_js = IRC::Indexer::Output::JSON->new(
     Input => $ref,
   );
-  
-  $json->{Networks}->{$network} = $n_js->dump;
 
-  ## clear and regenerate trawler
-  ## push back to $obj->{Trawlers}->{$network}
-  ## (where it was originally shifted off)
-  
+  $kernel->yield( '_cache_json',
+    $network, $server, $s_js, $n_js
+  );
+
+  ## Replace this finished trawler
   my $this_trawler_cf = $cfg->{Networks}->{$network}->{$server};
   unless (defined $this_trawler_cf) {
     log_to('irc', 'warn', 
@@ -352,6 +345,8 @@ sub _trawler_process {
   }
   my %trawlopts = %$this_trawler_cf;
   my $newtrawl = create_trawler(Server => $server, %trawlopts);
+
+  ## Push the replacement back to $obj->{Trawlers}->{$network}
   push(@{ $obj->{Trawlers}->{$network} }, $newtrawl);
   log_to('irc', 'info', "Spawned fresh trawler: $network: $server");
   
@@ -363,6 +358,18 @@ sub _trawler_process {
     );
     log_to('irc', 'info', "Scheduling single trawler for $network");
   }
+}
+
+sub _cache_json {
+  my $kernel = $_[KERNEL];
+  my ($network, $server, $s_obj, $n_obj) = @_[ARG0 .. $#_];
+  
+  $json->{Servers}->{$network}->{$server} = $s_obj->dump;
+
+  $json->{Networks}->{$network} = $n_obj->dump;
+  log_to('irc', 'info',
+    "Cached JSON: $network ($server)"
+  );
 }
 
 sub _timer_chk {
