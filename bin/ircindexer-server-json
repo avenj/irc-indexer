@@ -122,7 +122,8 @@ sub get_cfg {
 
   die "Specified conf not readable: $opts->{config}"
     unless -r $opts->{config};
-  
+
+  ## Try to set up primary conf: 
   my $cfpath = $opts->{config};
   my $conf = IRC::Indexer::Conf->new;
   $obj->{Cfg} = $conf;
@@ -141,9 +142,11 @@ sub get_cfg {
   for my $thisopt (keys %$cfg) {
     $cfg->{$thisopt} = $cfhash->{$thisopt};
   }
-  
+
+  ## Set up logging:
+  my $loglevel = $opts->{loglevel} || $cfg->{LogLevel} || 'info' ;
+    
   if ($cfg->{LogFile}) {
-    my $loglevel = $opts->{loglevel} || $cfg->{LogLevel} || 'info' ;
     my $handler = IRC::Indexer::Logger->new(
       LogFile  => $cfg->{LogFile},
       LogLevel => $loglevel,
@@ -151,8 +154,27 @@ sub get_cfg {
     $obj->{Log} = $handler->logger;
   }
   
-  $cfg->{ServerPort} //= 8700;
+  unless ($opts->{detach}) {
+    unless (blessed $obj->{Log}) {
+      my $handler = IRC::Indexer::Logger->new(
+        DevNull => 1,
+      );
+      $obj->{Log} = $handler->logger;
+    }
+    $obj->{Log}->add(
+      screen => {
+          log_to   => "STDOUT",
+          maxlevel => $loglevel || 'info',
+          timeformat     => "%Y/%m/%d %H:%M:%S",
+          message_layout => "[%T] %L (%p) %m",
+      },
+    );
+
+  }
   
+  $cfg->{ServerPort} //= 8700;
+
+  ## Read server specifications:  
   my $nethash = $conf->parse_nets($cfhash->{NetworkDir});
   $cfg->{Networks} = $nethash;
 }
@@ -224,13 +246,85 @@ sub poco_init_session {
         _start
         _stop
         _timer_chk
-        _trawler_chk
         _trawler_run
+        _trawler_process
       / ],
     ],
   );
 
   log_to('session', 'debug', 'Session initialized');
+}
+
+sub _trawler_process {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($network, $trawler) = @_[ARG0, ARG1];
+
+  ## passed trawler objects marked as done
+
+  unless (blessed $trawler) {
+    log_to('irc', 'warn', 
+      "Cannot _trawler_process unblessed trawler for $network"
+    );
+  }
+
+  my $server = $trawler->info->connectedto;
+
+  log_to('irc', 'info', 
+    "handling completed trawler: $network ($server)"
+  );
+  
+  if (my $err = $trawler->failed) {
+    log_to('irc', 'warn',
+      "trawler reports failure: $network ($server): $err"
+    );
+    next
+  }
+  
+  ## sort ListChans:
+  $trawler->info->channels;
+  
+  ## feed to JSONify
+  my $js = IRC::Indexer::Output::JSON->new(
+    Input => $trawler->dump,
+  );
+  
+  ## cache JSONified output
+  $json->{Servers}->{$network}->{$server} = $js->dump;
+  log_to('irc', 'debug',
+    "Cached JSON: $network ($server)"
+  );
+  
+  ## create an Info::Network if we don't have one
+  $obj->{NetInfo}->{$network} = IRC::Indexer::Info::Network->new()
+    unless blessed $obj->{NetInfo}->{$network};
+  
+  ## feed it this server's Info object:
+  $obj->{NetInfo}->{$network}->add_server($trawler->info);
+  
+  ## cache or refresh JSON for that, too:
+  my $ref = $obj->{NetInfo}->{$network}->dump;
+  my $n_js = IRC::Indexer::Output::JSON->new(
+    Input => $ref,
+  );
+  
+  $json->{Networks}->{$network} = $n_js->dump;
+
+  ## clear and regenerate trawler
+  ## push back to $obj->{Trawlers}->{$network}
+  ## (where it was originally shifted off)
+  
+  my $this_trawler_cf = $cfg->{Networks}->{$network}->{$server};
+  unless (defined $this_trawler_cf) {
+    log_to('session', 'warn', 
+      "Cannot readd trawler: missing conf: $network: $server"
+    );
+    return
+  }
+  my %trawlopts = %$this_trawler_cf;
+  log_to('irc', 'info', "Spawned fresh trawler: $network: $server");
+  my $newtrawl = create_trawler(Server => $server, %trawlopts);
+  
+  push(@{ $obj->{Trawlers}->{$network} }, $newtrawl);
 }
 
 sub _timer_chk {
@@ -241,111 +335,61 @@ sub _timer_chk {
 
   NETWORK: for my $network (keys %{$pool->{trawlers}}) {
     my $this_net = $pool->{trawlers}->{$network};
-    SERVER: for my $server (keys %$this_net) {
-      my $this_server = $this_net->{$server};
-
-      if ($this_server->{LastRun} && 
-        time - $this_server->{LastRun} > 600) {
-        ## FIXME configurable interval
-        ## 10 minutes passed, create a new trawler
-        my $this_cf = $cfg->{Networks}->{$network}->{$server};
-        my %trawlopts = %$this_cf;
-        my $trawler = create_trawler(Server => $server, %trawlopts);
-        $obj->{Trawlers}->{$network}->{$server} = $trawler;
-        log_to('irc', 'debug', "Re-initialized trawler for $server");
-        ## schedule a run event for this trawler
-        ## FIXME: configurable delay
-        $kernel->alarm_add('_trawler_run', time + 600, $trawler);
-        $this_server->{LastRun} = time + 600;
+    
+    my $last_trawled = $this_net->{LastRun};
+    
+    unless ($last_trawled) {
+      ## No trawlers have been run for this network, yet.
+      ## Spin one up, set LastRun time.
+      $this_net->{LastRun} = time();
+      if (@{ $obj->{Trawlers}->{$network} }) {
+        log_to('irc', 'debug', "Running initial trawler for $network");
+        $kernel->yield( '_trawler_run', 
+          $obj->{Trawlers}->{$network}->[0]
+        );
+        next NETWORK
+      } else {
+        log_to('irc', 'debug', "No trawlers to check for $network");
+        next NETWORK
       }
-
-      my $this_trawler = $obj->{Trawlers}->{$network}->{$server};
-
-      next SERVER unless blessed $this_trawler;
-
-      $this_server->{LastRun} = time;
-
-      push(@trawlers, [ $this_trawler, $network, $server ]);
     }
-  }
-  
-  $kernel->yield('_trawler_chk', @trawlers)
-    unless $heap->{TRAWLCHK_RUNNING};
+    
+    my $idx = 0;
+    TRAWLER: for my $trawler (@{ $obj->{Trawlers}->{$network} }) {
+      if ($trawler->done) {
+        ## Have a finished trawler.
 
-  $kernel->alarm('_timer_chk' => time + 3);
+        ## Splice this trawler out of this network's array:
+        splice @{ $obj->{Trawlers}->{$network} }, $idx, 1;
+        
+        ## It'll be handled by _trawler_process:
+        $kernel->yield( '_trawler_process', $network, $trawler );
+
+        ## Schedule the next one for this net to run in ten minutes.
+        my $next_trawler = $obj->{Trawlers}->{$network}->[0];
+        $kernel->alarm_add( '_trawler_run', time + 600, $next_trawler );
+      } else {
+        ## Trawler still pending or running.
+        my $servername = $trawler->info->connectedto;
+        log_to('irc', 'debug', 
+          "Trawler pending: $network: $servername"
+        );
+      }
+      ++$idx;
+    } ## TRAWLER
+
+  } ## NETWORK
+
+  $kernel->alarm('_timer_chk' => time + 3);  
 }
 
 sub _trawler_run {
-  my ($kernel, $heap, $trawler) = @_[KERNEL, HEAP];
-  return unless blessed $trawler;
+  my ($kernel, $heap, $trawler) = @_[KERNEL, HEAP, ARG0];
+  unless (blessed $trawler) {
+    log_to('irc', 'warn', "_trawler_run received unblessed trawler");
+    return
+  }
   $trawler->run;
-}
-
-sub _trawler_chk {
-  ## event _trawler_chk(@trawler_objs ...)
-  my ($kernel, $heap) = @_[KERNEL, HEAP];
-  my (@remaining) = @_[ARG0 .. $#_];
-  my $idx = 0;
-  
-  $heap->{TRAWLCHK_RUNNING} = 1;
-
-  ## check trawlers in a loop, 10 at a time
-  until (!@remaining || $idx == 10) {
-    ++$idx;
-    my $item = shift @remaining;
-    my ($trawler, $network, $server) = @$item;
-#    log_to('irc', 'debug', "Checking trawler: $network: $server");
-    if ($trawler->done) {
-      log_to('irc', 'info', 
-        "handling completed trawler: $network ($server)"
-      );
-      
-      if (my $err = $trawler->failed) {
-        log_to('irc', 'warn',
-          "trawler reports failure: $network ($server): $err"
-        );
-        next
-      }
-      
-      ## sort ListChans:
-      $trawler->info->channels;
-      
-      ## feed to JSONify
-      my $js = IRC::Indexer::Output::JSON->new(
-        Input => $trawler->dump,
-      );
-      
-      ## cache JSONified output
-      $json->{Servers}->{$network}->{$server} = $js->dump;
-      log_to('irc', 'debug',
-        "Cached JSON: $network ($server)"
-      );
-      
-      ## create an Info::Network if we don't have one
-      $obj->{NetInfo}->{$network} = IRC::Indexer::Info::Network->new()
-        unless blessed $obj->{NetInfo}->{$network};
-      
-      ## feed it this server's Info object:
-      $obj->{NetInfo}->{$network}->add_server($trawler->info);
-      
-      ## cache or refresh JSON for that, too:
-      my $ref = $obj->{NetInfo}->{$network}->dump;
-      my $n_js = IRC::Indexer::Output::JSON->new(
-        Input => $ref,
-      );
-      
-      $json->{Networks}->{$network} = $n_js->dump;
-      
-      $obj->{Trawlers}->{$network}->{$server} = undef;
-    }
-    
-  }
-  
-  if (@remaining) {
-    $kernel->yield('_trawler_chk', @remaining);
-  } else {
-    delete $heap->{TRAWLCHK_RUNNING};
-  }
 }
 
 sub create_trawler {
@@ -379,36 +423,27 @@ sub _start {
   NETWORK: for my $network (keys %{ $cfg->{Networks} }) {
     ++$total_nets;
     my $this_net = $cfg->{Networks}->{$network};
-    my $sc_count = 0;
     SERVER: for my $server (keys %$this_net) {
       ++$total_servers;
       my $this_cf = $this_net->{$server};
       
-      log_to('irc', 'debug', "New trawler: $network -> $server");
+      log_to('irc', 'debug', "Init trawler: $network -> $server");
 
       my %trawlopts = %$this_cf;
       my $trawler = create_trawler(Server => $server, %trawlopts);
       
-      $obj->{Trawlers}->{$network}->{$server} = $trawler;
+      ## push to network's trawler array
+      push( @{ $obj->{Trawlers}->{$network} }, $trawler);
       
-      log_to('irc', 'debug', "Starting trawler for $server");
-      
-      ## schedule a run event for this trawler
-      if ($sc_count) {
-        $kernel->alarm_add('_trawler_run', time + $sc_count, $trawler);
-      } else {
-        $trawler->run;
-      }
+      log_to('irc', 'debug', "Trawler constructed for $server");      
+    } ## SERVER
+          
+    ## add to chk pool
+    $state->{timers}->{trawlers}->{$network} = {
+      LastRun => 0,
+    };
 
-      ## add to chk pool      
-      $state->{timers}->{trawlers}->{$network}->{$server} = {
-        LastRun => 0,
-      };
-      
-      ## FIXME: configurable
-      $sc_count += 600;
-    }
-  }
+  } ## NETWORK
   
   $kernel->alarm('_timer_chk' => time + 3);
 
