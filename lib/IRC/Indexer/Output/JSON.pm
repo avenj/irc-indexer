@@ -11,7 +11,8 @@ our @ISA = qw/IRC::Indexer::Output/;
 sub dump {
   my ($self) = @_;
   my $input = $self->{Input};
-  $self->{Output} = encode_json($input);
+  my $json = JSON::XS->new->utf8(1)->pretty->encode($input);
+  $self->{Output} = $json;
   $self->SUPER::dump();
 }
 

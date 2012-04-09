@@ -16,7 +16,6 @@ use IRC::Indexer::Info::Network;
 
 use IRC::Indexer::Output::JSON;
 
-
 use URI;
 
 use POEx::HTTP::Server;
@@ -166,17 +165,9 @@ sub log_to {
 }
 
 sub poco_cfg_httpd {
-  $state->{handlers} = [
-    '^/$' => 'poe:indexerhttp/h_root',
-
-    '^/stats'   => 'poe:indexerhttp/h_stats', 
-    '^/network' => 'poe:indexerhttp/h_network',
-
-    '' => 'poe:indexerhttp/h_error_404',
-  ];
   
   $state->{htevents} = [ map { 'h_'.$_ } qw/
-     root error_404
+     error_404
      stats
      server network
   / ];
@@ -187,7 +178,12 @@ sub poco_cfg_httpd {
       LocalPort => $cfg->{ServerPort},
     },
     
-    handlers => dclone($state->{handlers}),
+    handlers => [
+      '^/stats'   => 'poe:indexerhttp/h_stats', 
+      '^/network' => 'poe:indexerhttp/h_network',
+
+      '' => 'poe:indexerhttp/h_error_404',
+    ],
   );
   
   log_to('http', 'info', 'HTTP configured');
@@ -222,9 +218,9 @@ sub _timer_chk {
     SERVER: for my $server (keys %$this_net) {
       my $this_server = $this_net->{$server};
 
-      if (time - $this_server->{LastRun} > 300) {
+      if (time - $this_server->{LastRun} > 600) {
         ## FIXME configurable interval
-        ## 5 minutes passed, create a new trawler
+        ## 10 minutes passed, create a new trawler
         my $this_cf = $cfg->{Networks}->{$network}->{$server};
         my %trawlopts = %$this_cf;
         my $trawler = create_trawler(Server => $server, %trawlopts);
@@ -275,6 +271,9 @@ sub _trawler_chk {
         next
       }
       
+      ## sort ListChans:
+      $trawler->info->channels;
+      
       ## feed to JSONify
       my $js = IRC::Indexer::Output::JSON->new(
         Input => $trawler->dump,
@@ -291,9 +290,7 @@ sub _trawler_chk {
         unless blessed $obj->{NetInfo}->{$network};
       
       ## feed it this server's Info object:
-      $obj->{NetInfo}->{$network}->add_server(
-        $trawler->info
-      );
+      $obj->{NetInfo}->{$network}->add_server($trawler->info);
       
       ## cache or refresh JSON for that, too:
       my $ref = $obj->{NetInfo}->{$network}->dump;
@@ -339,7 +336,7 @@ sub _start {
   ## init httpd
   my @htstates = poco_cfg_httpd();
   
-  ## add states from $state->{handlers}
+  ## add states from $state->{htevents}
   $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};
   
   my($total_nets, $total_servers);
@@ -395,27 +392,6 @@ sub h_error_404 {
   $resp->error(404, "Undefined action: ".$req->uri);
 }
 
-sub h_root {
-  my ($kernel, $heap) = @_[KERNEL, HEAP];
-  my ($req, $resp) = @_[ARG0, ARG1];
-  ## templated html root ?
-  $resp->content_type('text/html');
-  $resp->content("
-   <html><head><title>IRC::Indexer</title></head>
-   <body>
-   <p>Running.</p>
-   </body>
-   </html>
-  ");
-  $resp->respond;
-
-  my $conn = $req->connection;
-  my $addr = $conn->remote_host;
-  log_to('http', 'info', "$addr 200 h_root");
-
-  $resp->done;
-}
-
 sub h_stats {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($req, $resp) = @_[ARG0, ARG1];
@@ -442,11 +418,10 @@ sub h_stats {
       Networks => $n_count,
       Servers  => $s_count,
     };
-    $resp->content( encode_json($ref) );
+    my $json = JSON::XS->new->utf8(1)->pretty->encode($ref);
+    $resp->content($json);
   }
 
-  $resp->respond;
-  
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_stats");
@@ -475,8 +450,6 @@ sub h_server {
   $resp->content_type('application/json');
   $resp->content($json);
 
-  $resp->respond;
-
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_server $network $server");
@@ -504,8 +477,10 @@ sub h_network {
   ## if this is a /network/<net>/server, hand it off
   if ($chunks[1] && $chunks[1] eq "server") {
     my $server = $chunks[2];
-    $kernel->yield( h_error_404 => $req, $resp )
-      unless $server;
+    unless ($server) {
+      $kernel->yield( h_error_404 => $req, $resp );
+      return
+    }
     $kernel->yield( h_server => $req, $resp, $network, $server );
     return
   }
@@ -520,8 +495,6 @@ sub h_network {
   
   $resp->content_type('application/json');
   $resp->content($json);
-
-  $resp->respond;
 
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
@@ -566,13 +539,13 @@ information to JSON via HTTP for ease of retrieval.
 Network information hashes are exported via B</network/> routes:
 
   ## JSON Network Info hash for 'CobaltIRC':
-  http://my.server:9200/network/CobaltIRC
+  http://my.server:8700/network/CobaltIRC
 
 =head3 Servers
 
 Specific server hashes as described in L<IRC::Indexer::Trawl::Bot> are 
 exported via /network/<NETNAME>/server/<SERVERNAME>:
 
-  http://my.server:9200/network/CobaltIRC/server/eris.oppresses.us
+  http://my.server:8700/network/CobaltIRC/server/eris.oppresses.us
 
 =cut
