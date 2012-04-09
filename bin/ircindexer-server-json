@@ -6,10 +6,16 @@ use warnings;
 use POE;
 
 use IRC::Indexer;
+
 use IRC::Indexer::Conf;
 use IRC::Indexer::Logger;
+
+use IRC::Indexer::Trawl::Bot;
+
 use IRC::Indexer::Info::Network;
+
 use IRC::Indexer::Output::JSON;
+
 
 use URI;
 
@@ -18,9 +24,18 @@ use POEx::HTTP::Server;
 use Scalar::Util qw/blessed/;
 use Storable qw/dclone/;
 
+use JSON::XS;
+
 my $opts = {
   help => sub {
-  
+    print(
+      "ircindexer-server-json\n\n",
+      
+      "  -c, --config=PATH\n",
+      "       Configuration file for this server.\n\n",
+      
+    );
+    exit 0
   },
   
   version => sub {
@@ -34,8 +49,6 @@ GetOptions( $opts,
   qw/
     help 
     version
-    
-    port:8700
     
     config=s
     
@@ -68,13 +81,12 @@ my $state = {
 
 my $cfg = { 
   Networks => {},
-  Interval => 15,
-  Timeout  => 90,
+  ServerPort => 8700,
   
   LogFile  => undef,
   LogLevel => undef,
-  LogHTTP  => undef,
-  LogIRC   => undef,
+  LogHTTP  => 1,
+  LogIRC   => 1,
 };
 
 sub get_cfg {
@@ -90,13 +102,14 @@ sub get_cfg {
   die "Specified conf not readable: $opts->{config}"
     unless -r $opts->{config};
   
+  my $cfpath = $opts->{config};
   my $conf = IRC::Indexer::Conf->new;
   $obj->{Cfg} = $conf;
   my $cfhash;
   
   {
     local $@;
-    eval { $cfhash = $conf->parse_conf($opts->{config}) };
+    eval { $cfhash = $conf->parse_conf($cfpath) };
     die "Could not parse conf: $@" if $@;
   }
   
@@ -116,6 +129,8 @@ sub get_cfg {
     );
     $obj->{Log} = $handler->logger;
   }
+  
+  $cfg->{ServerPort} //= 8700;
   
   my $nethash = $conf->parse_nets($cfhash->{NetworkDir});
   $cfg->{Networks} = $nethash;
@@ -169,7 +184,7 @@ sub poco_cfg_httpd {
 
   POEx::HTTP::Server->spawn(
     inet => {
-      LocalPort => $opts->{port},
+      LocalPort => $cfg->{ServerPort},
     },
     
     handlers => dclone($state->{handlers}),
@@ -207,15 +222,25 @@ sub _timer_chk {
     SERVER: for my $server (keys %$this_net) {
       my $this_server = $this_net->{$server};
 
-      ## FIXME configurable trawl interval
-      next SERVER unless time - $this_server->{LastRun} > 300;
-
-      my $this_trawler = $state->{Trawlers}->{$network}->{$server};
+      my $this_trawler = $obj->{Trawlers}->{$network}->{$server};
       next SERVER unless blessed $this_trawler;
 
-      push(@trawlers, [ $this_trawler, $network, $server ]);
-      
+      if ($this_trawler->done && time - $this_server->{LastRun} > 300) {
+        ## FIXME configurable interval
+        ## 5 minutes passed, create a new trawler
+        my $this_cf = $cfg->{Networks}->{$network}->{$server};
+        my %trawlopts = %$this_cf;
+        my $trawler = create_trawler(Server => $server, %trawlopts);
+        $obj->{Trawlers}->{$network}->{$server} = $trawler;
+        log_to('irc', 'debug', "Starting trawler for $server");
+        $trawler->run;
+      }
+
       $this_server->{LastRun} = time;
+
+      log_to('irc', 'debug', "Checking trawler: $network: $server");
+
+      push(@trawlers, [ $this_trawler, $network, $server ]);
     }
   }
   
@@ -232,7 +257,7 @@ sub _trawler_chk {
   my $idx = 0;
   
   $heap->{TRAWLCHK_RUNNING} = 1;
-  
+
   ## check trawlers in a loop, 10 at a time
   until (!@remaining || $idx == 10) {
     ++$idx;
@@ -271,13 +296,15 @@ sub _trawler_chk {
       );
       
       ## cache or refresh JSON for that, too:
-      my $ref = $obj->{NetInfo}->{$network};
+      my $ref = $obj->{NetInfo}->{$network}->dump;
       my $n_js = IRC::Indexer::Output::JSON->new(
         Input => $ref,
       );
       
       $json->{Networks}->{$network} = $n_js->dump;
     }
+    
+    ## FIXME schedule an event to restart this trawler
   }
   
   if (@remaining) {
@@ -285,6 +312,21 @@ sub _trawler_chk {
   } else {
     delete $heap->{TRAWLCHK_RUNNING};
   }
+}
+
+sub create_trawler {
+  my %trawlopts = @_;
+  my $this_cf = \%trawlopts;
+  my $trawler = IRC::Indexer::Trawl::Bot->new(
+    Server => $this_cf->{Server},
+    Port   => $this_cf->{Port},
+    Nickname => $this_cf->{Nickname},
+    Timeout  => $this_cf->{Timeout},
+    Interval => $this_cf->{Interval},
+    BindAddr => $this_cf->{BindAddr},
+    UseIPV6  => $this_cf->{UseIPV6},
+  );
+  return $trawler
 }
 
 sub _start {
@@ -299,25 +341,18 @@ sub _start {
   ## add states from $state->{handlers}
   $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};
   
-  my ($total_nets, $total_servers);
-  NETWORK: for my $network (keys %{ $state->{Networks} }) {
+  my($total_nets, $total_servers);
+  NETWORK: for my $network (keys %{ $cfg->{Networks} }) {
     ++$total_nets;
-    my $this_net = $state->{Networks}->{$network};
+    my $this_net = $cfg->{Networks}->{$network};
     SERVER: for my $server (keys %$this_net) {
       ++$total_servers;
       my $this_cf = $this_net->{$server};
       
       log_to('irc', 'debug', "New trawler: $network -> $server");
-      
-      my $trawler = IRC::Indexer::Trawl::Bot->new(
-        Server => $server,
-        Port   => $this_cf->{Port},
-        Nickname => $this_cf->{Nickname},
-        Timeout  => $this_cf->{Timeout},
-        Interval => $this_cf->{Interval},
-        BindAddr => $this_cf->{BindAddr},
-        UseIPV6  => $this_cf->{UseIPV6},
-      );
+
+      my %trawlopts = %$this_cf;
+      my $trawler = create_trawler(Server => $server, %trawlopts);
       
       $obj->{Trawlers}->{$network}->{$server} = $trawler;
       
@@ -352,7 +387,7 @@ sub h_error_404 {
   my $uri  = URI->new( $req->uri );
   my $path = $uri->path;
   my $conn = $req->connection;
-  my $addr = $conn->remote_addr;
+  my $addr = $conn->remote_host;
   
   log_to('http', 'info', "$addr 404 $path");
   
@@ -374,7 +409,7 @@ sub h_root {
   $resp->respond;
 
   my $conn = $req->connection;
-  my $addr = $conn->remote_addr;
+  my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_root");
 
   $resp->done;
@@ -411,6 +446,8 @@ sub h_stats {
 
   $resp->respond;
   
+  my $conn = $req->connection;
+  my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_stats");
   
   $resp->done;
@@ -440,7 +477,7 @@ sub h_server {
   $resp->respond;
 
   my $conn = $req->connection;
-  my $addr = $conn->remote_addr;
+  my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_server $network $server");
   
   $resp->done;
@@ -486,11 +523,12 @@ sub h_network {
   $resp->respond;
 
   my $conn = $req->connection;
-  my $addr = $conn->remote_addr;
+  my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_network $network");
   $resp->done;
 }
 
+get_cfg();
 poco_init_session();
 POE::Kernel->run;
 
