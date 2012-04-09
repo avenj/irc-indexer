@@ -726,11 +726,18 @@ Network information hashes are exported via B</network/> routes:
   ## JSON Network Info hash for 'CobaltIRC':
   http://my.server:8700/network/CobaltIRC
 
+  ## JSON array of available trawled networks:
+  http://my.server:8700/network
+
 =head3 Servers
 
 Specific server hashes as described in L<IRC::Indexer::Trawl::Bot> are 
 exported via /network/<NETNAME>/server/<SERVERNAME>:
 
+  ## List of trawled servers for this network:
+  http://my.server:8700/network/CobaltIRC/server
+
+  ## Trawl results from a single server:
   http://my.server:8700/network/CobaltIRC/server/eris.oppresses.us
 
 =cut
