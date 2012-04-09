@@ -613,7 +613,7 @@ sub h_server {
         && defined $cfg->{Networks}->{$network}->{$server}
     ) {
       ## configured but not trawled (yet)
-      $reason = "$server ($network) pending trawler run";
+      $reason = "$server ($network) configured but no data";
     } else {
       $reason = "No such server";
     }
@@ -832,6 +832,13 @@ available via B</list>:
   ## JSON hash containing network -> server mapping of
   ## configured trawlers:
   http://my.server:8700/list
+
+Note that this is the list of configured network -> server maps, not 
+necessarily the list of B<trawled> servers.
+
+That is to say, the network names are guaranteed valid, but the server 
+names may not be available under the /network/<NET>/server/ tree; for a 
+list of servers available for retrieval, see L</Servers>, below.
 
 =head3 Networks
 
