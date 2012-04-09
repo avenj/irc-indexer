@@ -60,7 +60,9 @@ my $state = {
   timers => { trawlers => {} },
   stats  => {
     StartedAt => time,
-    RunCount  => 0,
+    
+    TotalNetworks => 0,
+    TotalServers  => 0,
   },
 };
 
@@ -77,6 +79,8 @@ my $cfg = {
 
 sub get_cfg {
   ## set up $cfg and logging
+  
+  ## FIXME catch sighup and call get_cfg again?
   
   die "No --config specified.\n" unless $opts->{config};
   
@@ -295,9 +299,12 @@ sub _start {
   ## add states from $state->{handlers}
   $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};
   
+  my ($total_nets, $total_servers);
   NETWORK: for my $network (keys %{ $state->{Networks} }) {
+    ++$total_nets;
     my $this_net = $state->{Networks}->{$network};
     SERVER: for my $server (keys %$this_net) {
+      ++$total_servers;
       my $this_cf = $this_net->{$server};
       
       log_to('irc', 'debug', "New trawler: $network -> $server");
@@ -316,8 +323,8 @@ sub _start {
       
       log_to('irc', 'debug', "Starting trawler for $server");
       $trawler->run;
-      
-      ## FIXME add to check pool
+
+      ## add to chk pool      
       $state->{timers}->{trawlers}->{$network}->{$server} = {
         LastRun => 0,
       };
@@ -325,8 +332,13 @@ sub _start {
   }
   
   $kernel->alarm('_timer_chk' => time + 3);
-  
-  ## FIXME log number of trawlers spawned
+
+  log_to('irc', 'info',
+    "Trawling $total_servers across $total_nets"
+  );
+
+  $state->{stats}->{TotalNetworks} = $total_nets;
+  $state->{stats}->{TotalServers}  = $total_servers;
 }
 
 sub _stop {}
@@ -372,6 +384,35 @@ sub h_stats {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($req, $resp) = @_[ARG0, ARG1];
 
+  my $uri = URI->new($req->uri);
+  my @chunks = $uri->path_segments;
+  splice @chunks, 0, 2;
+
+  my ($method) = @chunks;
+  $method = 'json' unless $method;
+  
+  my $n_count = $state->{stats}->{TotalNetworks};
+  my $s_count = $state->{stats}->{TotalServers};
+  
+  if ($method eq 'text' || $method eq 'plain') {
+    $resp->content_type('text/plain');
+    $resp->content(
+        "Trawling $s_count servers across $n_count networks\n\n"
+      . "Version: $IRC::Indexer::VERSION\n\n"
+    );
+  } else {
+    $resp->content_type('application/json');
+    my $ref = {
+      Networks => $n_count,
+      Servers  => $s_count,
+    };
+    $resp->content( encode_json($ref) );
+  }
+
+  $resp->respond;
+  
+  log_to('http', 'info', "$addr 200 h_stats");
+  
   $resp->done;
 }
 
@@ -417,6 +458,7 @@ sub h_network {
   ## if there's no network specified, 404
   my ($network) = @chunks;
   unless ($network) {
+    ## FIXME supply JSONified network list?
     $kernel->yield( h_error_404 => $req, $resp );
     return
   }
@@ -430,6 +472,7 @@ sub h_network {
     return
   }
 
+  ## otherwise, try to serve a net hash
   unless (defined $json->{Networks}->{$network}) {
     $kernel->yield( h_error_404 => $req, $resp );
     return
