@@ -3,29 +3,26 @@ use 5.12.1;
 use strict;
 use warnings;
 
+## Core:
 use POSIX ();
+use Scalar::Util qw/blessed/;
+use Storable     qw/dclone/;
 
+## POE + HTTP
 use POE;
+use URI;
+use POEx::HTTP::Server;
 
+## Indexer:
 use IRC::Indexer;
 
 use IRC::Indexer::Conf;
 use IRC::Indexer::Logger;
 
 use IRC::Indexer::Trawl::Bot;
-
 use IRC::Indexer::Info::Network;
 
 use IRC::Indexer::Output::JSON;
-
-use URI;
-
-use POEx::HTTP::Server;
-
-use Scalar::Util qw/blessed/;
-use Storable qw/dclone/;
-
-use JSON::XS;
 
 my $opts = {
   help => sub {
@@ -215,7 +212,9 @@ sub poco_cfg_httpd {
      src
      stats
      server 
+     servlist
      network
+     netlist
   / ];
 
 
@@ -227,6 +226,7 @@ sub poco_cfg_httpd {
     handlers => [
       '^/stats'   => 'poe:indexerhttp/h_stats', 
       '^/network' => 'poe:indexerhttp/h_network',
+      '^/netlist' => 'poe:indexerhttp/h_netlist',
       '^/src'     => 'poe:indexerhttp/h_src',
 
       '' => 'poe:indexerhttp/h_error_404',
@@ -290,7 +290,7 @@ sub _trawler_process {
   
   ## cache JSONified output
   $json->{Servers}->{$network}->{$server} = $js->dump;
-  log_to('irc', 'debug',
+  log_to('irc', 'info',
     "Cached JSON: $network ($server)"
   );
   
@@ -343,7 +343,7 @@ sub _timer_chk {
       ## Spin one up, set LastRun time.
       $this_net->{LastRun} = time();
       if (@{ $obj->{Trawlers}->{$network} }) {
-        log_to('irc', 'debug', "Running initial trawler for $network");
+        log_to('irc', 'info', "Running initial trawler for $network");
         $kernel->yield( '_trawler_run', 
           $obj->{Trawlers}->{$network}->[0]
         );
@@ -354,6 +354,7 @@ sub _timer_chk {
       }
     }
     
+    my @pending;
     my $idx = 0;
     TRAWLER: for my $trawler (@{ $obj->{Trawlers}->{$network} }) {
       if ($trawler->done) {
@@ -371,12 +372,14 @@ sub _timer_chk {
       } else {
         ## Trawler still pending or running.
         my $servername = $trawler->info->connectedto;
-        log_to('irc', 'debug', 
-          "Trawler pending: $network: $servername"
-        );
+        push(@pending, $servername);
       }
       ++$idx;
     } ## TRAWLER
+
+    log_to('irc', 'debug',
+      "Trawlers pending for $network: ". join ', ', @pending
+    );
 
   } ## NETWORK
 
@@ -427,7 +430,7 @@ sub _start {
       ++$total_servers;
       my $this_cf = $this_net->{$server};
       
-      log_to('irc', 'debug', "Init trawler: $network -> $server");
+      log_to('irc', 'info', "Init trawler: $network -> $server");
 
       my %trawlopts = %$this_cf;
       my $trawler = create_trawler(Server => $server, %trawlopts);
@@ -568,6 +571,53 @@ sub h_server {
   $resp->done;
 }
 
+sub h_servlist {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($req, $resp, $network) = @_[ARG0, ARG1, ARG2];
+  ## handed off by h_network
+
+  my $servlist = [ keys %{ $json->{Servers}->{$network}//{} } ];
+  my $jsify = IRC::Indexer::Output::JSON->new(
+    Input => $servlist,
+  );
+  my $json = $jsify->dump;
+  
+  $resp->content_type('application/json');
+  $resp->content($json);
+  
+  $resp->respond;
+
+  my $conn = $req->connection;
+  my $addr = $conn->remote_host;
+  log_to('http', 'info', "$addr 200 h_servlist $network");
+  
+  $resp->done;
+}
+
+sub h_netlist {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($req, $resp) = @_[ARG0, ARG1];
+
+  ## Return JSONified array of pullable networks:
+
+  my $netlist = [ keys %{ $json->{Networks}//{} } ];
+  my $jsify = IRC::Indexer::Output::JSON->new(
+    Input => $netlist,
+  );
+  my $json = $jsify->dump;
+  
+  $resp->content_type('application/json');
+  $resp->content($json);
+
+  $resp->respond;
+
+  my $conn = $req->connection;
+  my $addr = $conn->remote_host;
+  log_to('http', 'info', "$addr 200 h_netlist");
+
+  $resp->done;
+}
+
 sub h_network {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($req, $resp) = @_[ARG0, ARG1];
@@ -577,19 +627,25 @@ sub h_network {
   my @chunks = $uri->path_segments;
   splice @chunks, 0, 2;
 
-  ## if there's no network specified, 404
   my ($network) = @chunks;
   unless ($network) {
-    ## FIXME supply JSONified network list?
+    ## supply JSONified network list:
+    $kernel->yield( h_netlist => $req, $resp );
+    return
+  }
+
+  ## We don't know this network:
+  unless (defined $json->{Networks}->{$network}) {
     $kernel->yield( h_error_404 => $req, $resp );
     return
   }
     
-  ## if this is a /network/<net>/server, hand it off
+  ## if this is a /network/<net>/server, hand it off:
   if ($chunks[1] && $chunks[1] eq "server") {
     my $server = $chunks[2];
     unless ($server) {
-      $kernel->yield( h_error_404 => $req, $resp );
+      ## supply available server list:
+      $kernel->yield( h_servlist => $req, $resp, $network );
       return
     }
     $kernel->yield( h_server => $req, $resp, $network, $server );
@@ -597,10 +653,6 @@ sub h_network {
   }
 
   ## otherwise, try to serve a net hash
-  unless (defined $json->{Networks}->{$network}) {
-    $kernel->yield( h_error_404 => $req, $resp );
-    return
-  }
   
   my $json = $json->{Networks}->{$network};
   
