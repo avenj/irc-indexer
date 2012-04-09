@@ -4,6 +4,8 @@ bin/ircindexer-multi
 bin/ircindexer-server-json
 Build.PL
 lib/IRC/Indexer.pm
+lib/IRC/Indexer/POD/ServerSpec.pod
+lib/IRC/Indexer/POD/NetworkSpec.pod
 lib/IRC/Indexer/Conf.pm
 lib/IRC/Indexer/Logger.pm
 lib/IRC/Indexer/Output.pm
