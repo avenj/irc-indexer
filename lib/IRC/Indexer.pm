@@ -47,4 +47,6 @@ using the trawl bot itself as part of other POE-enabled applications.
 
 Jon Portnoy <avenj@cobaltirc.org>
 
+L<http://www.cobaltirc.org>
+
 =cut

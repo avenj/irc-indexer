@@ -321,6 +321,8 @@ The B<netinfo> method returns a hash with the following keys:
 These all roughly correspond to their respective accessors, documented 
 above.
 
+See L<IRC::Indexer::POD::ServerSpec> for details.
+
 =head1 AUTHOR
 
 Jon Portnoy <avenj@cobaltirc.org>
