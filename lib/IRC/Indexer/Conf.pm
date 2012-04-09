@@ -80,7 +80,8 @@ sub find_nets {
     },
     $dir
   );
-  return @found;
+
+  return wantarray ? @found : \@found ;
 }
 
 sub slurp {
@@ -109,6 +110,60 @@ Port: 6667
 #UseIPV6:
 #Timeout: 90
 #Interval: 15
+
+END
+
+  return $conf
+}
+
+sub example_cf_httpd {
+  my $conf = <<END;
+---
+### Example HTTPD conf
+
+## NetworkDir:
+##
+## Network spec files will be found recursively under NetworkDir:
+## A network spec file should end in ".server"
+## These specs tie networks together under their specified Network:
+## The files should be YAML, looking something like:
+#   ---
+#   Network: CobaltIRC
+#   Server: eris.oppresses.us
+#   Port: 6667
+#   Timeout: 90
+#   Interval: 15
+##
+NetworkDir: /home/ircindex/networks
+
+## ServerPort:
+##
+## Port to run this HTTPD instance on.
+ServerPort: 8700
+
+## LogFile:
+##
+## Path to log file.
+## If omitted, no logging takes place.
+LogFile: /home/ircindex/indexer.log
+
+## LogLevel:
+##
+## Log verbosity level.
+## 'debug', 'info', or 'warn'
+LogLevel: info
+
+## LogHTTP:
+##
+## If true, log HTTP-related activity
+## Defaults to ON
+LogHTTP: 1
+
+## LogIRC:
+##
+## If true, log trawling-related activity
+## Defaults to ON
+LogIRC: 1
 
 END
 
@@ -170,8 +225,24 @@ END
   return $conf
 }
 
+sub get_example_cf {
+  my ($self, $cftype) = @_;
+  my $method = 'example_cf_'.$cftype;
+  
+  unless ($self->can($method)) {
+    croak "Invalid example conf type: $cftype"
+  }
+
+  return $self->$method
+}
+
 sub write_example_cf {
-  my ($self, $path, $conf) = @_;
+  my ($self, $cftype, $path) = @_;
+  croak "write_example_cf requires a type and path"
+    unless $cftype and $path;
+  
+  my $conf = $self->get_example_cf($cftype); 
+
   open my $fh, '>', $path or die "open failed: $!\n";
   print $fh $conf;
   close $fh;
@@ -184,7 +255,7 @@ __END__
 
 =head1 NAME
 
-IRC::Indexer::Conf - Handle YAML configuration files
+IRC::Indexer::Conf - Handle Indexer configuration files
 
 =head1 SYNOPSIS
 
@@ -197,21 +268,66 @@ IRC::Indexer::Conf - Handle YAML configuration files
 
 =head1 DESCRIPTION
 
-Deserialize IRC::Indexer configuration files.
+Handle IRC::Indexer configuration files in YAML format.
 
-FIXME
+This module can also generate example configuration files.
 
 =head1 METHODS
 
-FIXME
+Methods can be called as either class or object methods.
 
 =head2 parse_conf
 
+Takes a file path.
+
+Read and parse a specified YAML configuration file, returning the 
+deserialized contents.
+
 =head2 parse_nets
+
+Calls L</find_nets> on a specified directory and processes all of the 
+returned server spec files.
+
+  IRC::Indexer::Conf->parse_nets($spec_dir);
+
+Returns a hash with the following structure:
+
+  $NETWORK => {
+    $ServerA => $spec_file_hash,
+  }
 
 =head2 find_nets
 
-=head2 
+Locate C<.server> spec files recursively under a specified directory.
+
+  my @specfiles = IRC::Indexer::Conf->find_nets($spec_dir);
+
+Returns an array in list context or an array reference in scalar 
+context.
+
+=head2 get_example_cf
+
+Returns the raw YAML for an example configuration file.
+
+  IRC::Indexer::Conf->get_example_cf('httpd');
+
+Valid types are:
+
+  httpd
+  spec
+  multi
+
+=head2 write_example_cf
+
+Writes an example configuration file to a specified path.
+
+  IRC::Indexer::Conf->write_example_cf('httpd', $path);
+  
+  ## From a shell, perhaps:
+  $ perl -MIRC::Indexer::Conf -e \
+    'IRC::Indexer::Conf->write_example_cf("httpd", "myhttpd.cf")'
+
+See L</get_example_cf> for a list of valid types.
 
 =head1 AUTHOR
 
