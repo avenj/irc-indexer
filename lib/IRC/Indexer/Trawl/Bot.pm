@@ -53,6 +53,8 @@ sub new {
   $self->{bindaddr} = $args{bindaddr} if $args{bindaddr};
   $self->{useipv6}  = $args{ipv6} || 0;
 
+  $self->{Serv}->connectedto( $self->{ircserver} );
+
   return $self
 }
 
@@ -190,12 +192,11 @@ sub _retrieve_info {
   
   ## called via alarm() (in irc_001)
 
-  my $irc = $self->irc;
+  my $irc = $self->irc;  
   
   my $info = $self->info;
   ## set up hash appropriately:
   my $server = $self->{ircserver};
-  $info->connectedto( $server );
   $info->servername( $irc->server_name );
   
   my $network = $irc->isupport('NETWORK') || $irc->server_name;
