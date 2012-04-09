@@ -222,10 +222,7 @@ sub _timer_chk {
     SERVER: for my $server (keys %$this_net) {
       my $this_server = $this_net->{$server};
 
-      my $this_trawler = $obj->{Trawlers}->{$network}->{$server};
-      next SERVER unless blessed $this_trawler;
-
-      if ($this_trawler->done && time - $this_server->{LastRun} > 300) {
+      if (time - $this_server->{LastRun} > 300) {
         ## FIXME configurable interval
         ## 5 minutes passed, create a new trawler
         my $this_cf = $cfg->{Networks}->{$network}->{$server};
@@ -234,9 +231,12 @@ sub _timer_chk {
         $obj->{Trawlers}->{$network}->{$server} = $trawler;
         log_to('irc', 'debug', "Starting trawler for $server");
         $trawler->run;
+        $this_server->{LastRun} = time;
       }
 
-      $this_server->{LastRun} = time;
+      my $this_trawler = $obj->{Trawlers}->{$network}->{$server};
+
+      next SERVER unless blessed $this_trawler;
 
       log_to('irc', 'debug', "Checking trawler: $network: $server");
 
@@ -302,9 +302,10 @@ sub _trawler_chk {
       );
       
       $json->{Networks}->{$network} = $n_js->dump;
+      
+      $obj->{Trawlers}->{$network}->{$server} = undef;
     }
     
-    ## FIXME schedule an event to restart this trawler
   }
   
   if (@remaining) {

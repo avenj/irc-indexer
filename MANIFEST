@@ -1,3 +1,4 @@
+bin/ircindexer-examplecf
 bin/ircindexer-single
 bin/ircindexer-multi
 bin/ircindexer-server-json

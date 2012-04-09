@@ -85,7 +85,7 @@ sub find_nets {
 }
 
 sub slurp {
-  my ($path) = @_;
+  my ($self, $path) = @_;
   my $slurped;
   open my $fh, '<:encoding(utf8)', $path or croak "open failed: $!";
   { local $/; $slurped = <$fh> }
@@ -225,6 +225,7 @@ END
   return $conf
 }
 
+sub get_example_conf { get_example_cf(@_) }
 sub get_example_cf {
   my ($self, $cftype) = @_;
   my $method = 'example_cf_'.$cftype;
@@ -236,6 +237,7 @@ sub get_example_cf {
   return $self->$method
 }
 
+sub write_example_conf { write_example_cf(@_) }
 sub write_example_cf {
   my ($self, $cftype, $path) = @_;
   croak "write_example_cf requires a type and path"
