@@ -5,8 +5,6 @@ use warnings;
 
 ## FIXME optional on-disk cache / persistency
 
-use Proc::PID::File;
-
 ## Core:
 use POSIX ();
 use Scalar::Util qw/blessed/;
