@@ -35,6 +35,10 @@ my $opts = {
       "  -c, --config=PATH\n",
       "       Configuration file for this server.\n\n",
       
+      "  -l, --loglevel=LEVEL\n",
+      "      Log verbosity, one of: debug, info, warn\n",
+      "      Overrides configuration file.\n\n",
+      
       "  -d, --detach\n",
       "       Run as a daemon process.\n\n",
       
@@ -55,7 +59,7 @@ my $opts = {
   
   detach => 0,
 
-  interval => 600,  
+  interval => 600,
 };
 
 use Getopt::Long;
@@ -69,6 +73,8 @@ GetOptions( $opts,
     detach!
 
     interval=i
+    
+    loglevel=s
     
     showsource
   /,
@@ -269,12 +275,12 @@ sub _trawler_process {
   my $server = $trawler->info->connectedto;
 
   log_to('irc', 'info', 
-    "handling completed trawler: $network ($server)"
+    "Completed trawler: $network ($server)"
   );
   
   if (my $err = $trawler->failed) {
     log_to('irc', 'warn',
-      "trawler reports failure: $network ($server): $err"
+      "Trawler reports failure: $network ($server): $err"
     );
     next
   }
