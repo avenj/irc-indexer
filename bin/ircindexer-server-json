@@ -422,6 +422,8 @@ sub h_stats {
     $resp->content($json);
   }
 
+  $resp->respond;
+
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_stats");
@@ -449,6 +451,8 @@ sub h_server {
   
   $resp->content_type('application/json');
   $resp->content($json);
+
+  $resp->respond;
 
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
@@ -495,6 +499,8 @@ sub h_network {
   
   $resp->content_type('application/json');
   $resp->content($json);
+
+  $resp->respond;
 
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
