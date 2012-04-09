@@ -241,9 +241,8 @@ sub _check_timeout {
   
   $shutdown++ if $stc == scalar @states;
 
-  my $startedat = $info->startedat || return;
-  
-  $shutdown++ if time - $startedat > $self->{timeout};
+  my $connectedat = $info->connectedat || return;
+  $shutdown++ if time - $connectedat > $self->{timeout};
 
   if ($shutdown) {
     warn "-> shutdown\n" if $self->verbose;

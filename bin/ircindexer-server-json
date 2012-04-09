@@ -55,6 +55,7 @@ my $opts = {
   
   detach => 0,
   
+  ## FIXME this is configurable now
   interval => 600,
   
 };
