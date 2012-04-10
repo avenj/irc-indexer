@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Carp;
 
-## FIXME add LINKS
+use Storable qw/dclone/;
 
 use Scalar::Util qw/blessed/;
 

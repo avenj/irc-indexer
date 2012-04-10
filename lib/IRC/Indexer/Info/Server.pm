@@ -26,6 +26,11 @@ sub new {
   return $self
 }
 
+sub clone {
+  my ($self) = @_;
+  return dclone($self->{NetInfo})
+}
+
 sub info { netinfo(@_) }
 sub netinfo {
   my ($self) = @_;
@@ -101,7 +106,7 @@ sub blank_motd {
 sub motd {
   my ($self, $line) = @_;
   push(@{ $self->netinfo->{MOTD} }, $line) if $line;
-  return $self->netinfo->{MOTD}
+  return dclone($self->netinfo->{MOTD})
 }
 
 sub opercount { opers(@_) }
@@ -125,7 +130,7 @@ sub links {
   my ($self, $linklist) = @_;
   return $self->netinfo->{ListLinks} = $linklist
     if $linklist and ref $linklist eq 'ARRAY';
-  return $self->netinfo->{ListLinks}//[]
+  return dclone($self->netinfo->{ListLinks}//[])
   ## FIXME better links handling
 }
 
@@ -135,7 +140,7 @@ sub channels {
   return $self->netinfo->{ListChans} = $chanlist
     if $chanlist and ref $chanlist eq 'ARRAY';
   $self->_sort_listchans;
-  return $self->netinfo->{ListChans}//[]
+  return dclone($self->netinfo->{ListChans}//[])
 }
 
 sub hashchans { chanhash(@_) }
@@ -143,7 +148,7 @@ sub chanhash {
   my ($self, $hash) = @_;
   return $self->netinfo->{HashChans} = $hash 
     if $hash and ref $hash eq 'HASH';
-  return $self->netinfo->{HashChans}//{}
+  return dclone($self->netinfo->{HashChans}//{})
 }
 
 sub add_channel {
