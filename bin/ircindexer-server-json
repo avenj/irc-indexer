@@ -118,6 +118,7 @@ my $state = {
     TrawlersCreated  => 0,
     
     LastTrawl        => 0,
+    LastTrawledServer  =>
     
     HTTP_Responses   => 0,
   },
@@ -518,6 +519,7 @@ sub _trawler_run {
 
   ++$state->{stats}->{TrawlersExecuted};
   $state->{stats}->{LastTrawl} = time;
+  $state->{stats}->{LastTrawledServer} = $server;
 }
 
 sub create_trawler {
@@ -914,8 +916,9 @@ information as JSON via HTTP for ease of retrieval.
 
 Uses L<POEx::HTTP::Server> to provide HTTP daemon functionality.
 
-See L<IRC::Indexer::POD::ExampleClients> for some examples of ways to 
-make use of the exported data on the client side.
+Intended to serve as the back-end to a presentation system for the 
+data collected. See <IRC::Indexer::POD::ExampleClients> for some examples 
+of ways to make use of the exported data on the client side.
 
 =head2 Fetching JSON
 
