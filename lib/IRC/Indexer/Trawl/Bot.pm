@@ -1,5 +1,7 @@
 package IRC::Indexer::Trawl::Bot;
 
+## FIXME fix verbose/warn output
+
 ## feed me a server / port to connect to
 ## connect to the server / port
 ## grab relevant info, shove it into $self
@@ -69,6 +71,7 @@ sub run {
       qw/
          _start
          _stop
+         shutdown
          
          _check_timeout
          _retrieve_info
@@ -108,7 +111,7 @@ sub verbose {
 
 sub irc {
   my ($self, $irc) = @_;
-  return $self->{ircobj} = $irc if $irc and ref $irc;
+  return $self->{ircobj} = $irc if $irc;
   return $self->{ircobj}
 }
 
@@ -156,9 +159,26 @@ sub dump {
   return $self->info->netinfo
 }
 
-
 ## POE (internal)
-sub _stop {}
+sub _stop {
+#  carp "DEBUG trawl session stop"
+}
+
+sub shutdown {
+  my ($self, $kernel) = @_[OBJECT, KERNEL];
+  
+  $kernel->alarm('_check_timeout');
+  
+#  carp "DEBUG trawler shutdown called";
+  
+  warn "-> shutdown\n" if $self->verbose;
+  
+  $self->done(1);
+  $self->irc->yield('disconnect') if ref $self->irc;
+  $self->irc->yield('shutdown')   if ref $self->irc;
+  $self->irc(1);
+}
+
 sub _start {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   
@@ -245,10 +265,7 @@ sub _check_timeout {
   $shutdown++ if time - $connectedat > $self->{timeout};
 
   if ($shutdown) {
-    warn "-> shutdown\n" if $self->verbose;
-    $self->done(1);
-    $irc->yield('disconnect');
-    $irc->yield('shutdown');  
+    $kernel->post( $_[SESSION], 'shutdown' );
   }
   
   $kernel->alarm( '_check_timeout', time + 10 );
