@@ -13,6 +13,12 @@ sub new {
   my $self = {},
   my $class = shift;
   bless $self, $class;
+  
+  my %args = @_ if @_;
+  $args{lc $_} = delete $args{$_} for keys %args;
+  
+  $self->{NoGlobalMOTD} = 1 unless $args{servermotds};
+  
   $self->{Network} = {
     Servers => {
      ## ServerName => {
@@ -106,7 +112,8 @@ sub add_server {
 
   my $name = $info->server;
   my $motd = $info->motd;  
-  $servers->{$name}->{MOTD} = $motd;
+  $servers->{$name}->{TrawledAt} = $info->finishedat;
+  $servers->{$name}->{MOTD} = $motd unless $self->{NoGlobalMOTD};
   
   ## these can all be overriden network-wide:
   $network->{GlobalUsers} = $info->users;
@@ -131,6 +138,13 @@ IRC::Indexer::Info::Network - Network information class for IRC::Indexer
 =head1 SYNOPSIS
 
   my $network = IRC::Indexer::Info::Network->new;
+
+  ## Or: save server MOTDs to global network hash.  
+  ## Tracking a lot of MOTDs will eat memory fast.
+  my $network = IRC::Indexer::Info::Network->new(
+    ServerMOTDs => 1,
+  );
+  
   ## Get ::Info::Server object from finished trawl bot:
   my $info_obj  = $trawler->info;
   ## Feed it to add_server:
@@ -176,6 +190,8 @@ Returns the name of the last server added to this network.
 Returns the MOTD for a specified server:
 
   my $motd = $network->motd_for($servername);
+
+Only usable if ServerMOTDs was enabled for this network instance.
 
 =head3 users
 

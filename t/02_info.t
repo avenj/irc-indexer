@@ -104,7 +104,9 @@ is( $identical->server, 'eris.oppresses.us', 'imported server()' );
 
 ## Info::Network
 
-my $network = new_ok( 'IRC::Indexer::Info::Network' );
+my $network = new_ok( 'IRC::Indexer::Info::Network' => [ 
+  ServerMOTDs => 1,
+] );
 ok( $network->add_server($server), 'add_server()' );
 
 is( $network->users, 5, 'network users() compare' );
@@ -125,6 +127,8 @@ is_deeply( $servers,
         'MOTD line',
         'MOTD line 2'
       ],
+      
+      TrawledAt => $ts,
     },
   },
   'servers() compare'
