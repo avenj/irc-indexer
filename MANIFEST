@@ -24,3 +24,4 @@ Changes
 META.yml
 META.json
 t/01_loadable.t
+t/02_info.t

@@ -317,133 +317,77 @@ sub poco_init_session {
   log_to('session', 'debug', 'Session initialized');
 }
 
-sub _trawler_process {
+sub _start {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
-  my ($network, $trawler) = @_[ARG0, ARG1];
-
-  ## passed trawler objects marked as done
-
-  unless (blessed $trawler) {
-    log_to('irc', 'warn', 
-      "Cannot _trawler_process unblessed trawler for $network"
-    );
-  }
-
-  my $server = $trawler->info->connectedto;
-
-  log_to('irc', 'info', 
-    "Completed trawler: $network ($server)"
-  );
+  $kernel->alias_set('indexerhttp');
   
-  if (my $err = $trawler->failed) {
-    log_to('irc', 'warn',
-      "Trawler reports failure: $network ($server): $err"
-    );
-    next
-  }
+  $kernel->sig('INT', '_sig_int');
+  $kernel->sig('TERM', '_sig_int');
+
+  log_to('session', 'info', 'Session started');
+
+  ## init httpd
+  my @htstates = poco_cfg_httpd();
   
-  ## sort ListChans:
-  $trawler->info->channels;
-
-  ## feed to JSONify
-  my $s_js = IRC::Indexer::Output::JSON->new(
-    Input => $trawler->info->netinfo,
-  );
-
-  ## create an Info::Network if we don't have one
-  $obj->{NetInfo}->{$network} = IRC::Indexer::Info::Network->new()
-    unless blessed $obj->{NetInfo}->{$network};
+  $kernel->call( $_[SESSION], '_init_nets' );
   
-  ## feed it this server's Info object:
-  $obj->{NetInfo}->{$network}->add_server($trawler->info);
-
-  my $ref = $obj->{NetInfo}->{$network}->netinfo;
-  my $n_js = IRC::Indexer::Output::JSON->new(
-    Input => $ref,
-  );
-
-  $kernel->yield( '_cache_json',
-    $network, $trawler->info->servername, $s_js, $n_js
-  );
-
-  ## Replace this finished trawler
-  my $this_trawler_cf = $cfg->{Networks}->{$network}->{$server};
-  unless (defined $this_trawler_cf) {
-    log_to('irc', 'warn', 
-      "Cannot readd trawler: missing conf: $network: $server"
-    );
-    return
-  }
-  my %trawlopts = %$this_trawler_cf;
-  my $newtrawl = create_trawler(Server => $server, %trawlopts);
-
-  ## Push the replacement back to $obj->{Trawlers}->{$network}
-  push(@{ $obj->{Trawlers}->{$network} }, $newtrawl);
-  log_to('irc', 'info', "Spawned fresh trawler: $network: $server");
-  
-  ## If this is the only trawler, we can reschedule it now:
-  unless (@{ $obj->{Trawlers}->{$network} } > 1) {
-    my $next_run_at  = time + ($opts->{interval} || 600);
-    $kernel->alarm_add(
-      '_trawler_run', $next_run_at, $newtrawl
-    );
-    log_to('irc', 'info', "Scheduling single trawler for $network");
-  }
+  ## add states from $state->{htevents}
+  $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};  
 }
 
-sub cache_json {
-  my ($data, $network, $server) = @_;
+sub _init_nets {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
 
-  if ($server) {
-    ## store a server's json
+  ## called by either _start or _rehash
+  
+  ## clear objs if we have any
+  $obj->{Trawlers} = { };
 
-    if (tied %JSCache) {
-      ## using CacheDB
-      my $thiskey = $network.'%'.$server;
-      $JSCache{$thiskey} = $data;
-    } else {
-      $jsmemcache->{Servers}->{$network}->{$server} = $data;
-    }
+  my($total_nets, $total_servers);
+  NETWORK: for my $network (keys %{ $cfg->{Networks} }) {
+    ++$total_nets;
+    my $this_net = $cfg->{Networks}->{$network};
+    SERVER: for my $server (keys %$this_net) {
+      ++$total_servers;
+      my $this_cf = $this_net->{$server};
+      
+      log_to('irc', 'info', "Init trawler: $network -> $server");
 
-  } else {
-    ## store a network's json
+      my %trawlopts = %$this_cf;
+      my $trawler = create_trawler(Server => $server, %trawlopts);
+      
+      ## push to network's trawler array
+      push( @{ $obj->{Trawlers}->{$network} }, $trawler);
+      
+      log_to('irc', 'debug', "Trawler constructed for $server");      
+    } ## SERVER
+          
+    ## add to chk pool
+    $state->{timers}->{trawlers}->{$network} = {
+      LastRun => 0,
+    };
 
-    if (tied %JSCache) {
-      $JSCache{$network} = $data;
-    } else {
-      $jsmemcache->{Networks}->{$network} = $data;
-    }
+  } ## NETWORK
+  
+  $kernel->alarm('_timer_chk' => time + 3);
 
-  }
-}
-
-sub restore_json {
-  my ($network, $server) = @_;
-
-  if ($server) {
-
-    if (tied %JSCache) {
-      my $thiskey = $network.'%'.$server;
-      return $JSCache{$thiskey}
-    } else {
-      return unless exists $jsmemcache->{Servers}->{$network};
-      return $jsmemcache->{Servers}->{$network}->{$server}
-    }
-
-  } else {
-    return $JSCache{$network} if tied %JSCache;
-    return $jsmemcache->{Networks}->{$network}
-  }  
-}
-
-sub _cache_json {
-  my $kernel = $_[KERNEL];
-  my ($network, $server, $s_obj, $n_obj) = @_[ARG0 .. $#_];  
-  cache_json( $s_obj->dump, $network, $server );
-  cache_json( $n_obj->dump, $network );
   log_to('irc', 'info',
-    "Cached JSON: $network ($server)"
+    "Trawling $total_servers servers across $total_nets networks"
   );
+
+  $state->{stats}->{TotalNetworks} = $total_nets;
+  $state->{stats}->{TotalServers}  = $total_servers;  
+}
+
+sub _sig_int {
+  $_[KERNEL]->yield('_stop');
+}
+
+sub _stop {
+  log_to('session', 'warn', "_stop received");
+  unlink($cfg->{CacheDB}) if tied %JSCache;
+  undef %JSCache;
+  $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
 }
 
 sub _timer_chk {
@@ -534,6 +478,93 @@ sub _trawler_run {
   $state->{stats}->{LastTrawledServer} = $server;
 }
 
+sub _trawler_process {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  my ($network, $trawler) = @_[ARG0, ARG1];
+
+  ## passed trawler objects marked as done
+
+  unless (blessed $trawler) {
+    log_to('irc', 'warn', 
+      "Cannot _trawler_process unblessed trawler for $network"
+    );
+  }
+
+  my $server = $trawler->info->connectedto;
+
+  log_to('irc', 'info', 
+    "Completed trawler: $network ($server)"
+  );
+  
+  if (my $err = $trawler->failed) {
+    log_to('irc', 'warn',
+      "Trawler reports failure: $network ($server): $err"
+    );
+    next
+  }
+  
+  ## sort ListChans:
+  $trawler->info->channels;
+
+  ## feed to JSONify
+  my $s_js = IRC::Indexer::Output::JSON->new(
+    Input => $trawler->info->netinfo,
+  );
+
+  ## create an Info::Network if we don't have one
+  $obj->{NetInfo}->{$network} = IRC::Indexer::Info::Network->new()
+    unless blessed $obj->{NetInfo}->{$network};
+  
+  ## feed it this server's Info object:
+  $obj->{NetInfo}->{$network}->add_server($trawler->info);
+
+  my $ref = $obj->{NetInfo}->{$network}->netinfo;
+  my $n_js = IRC::Indexer::Output::JSON->new(
+    Input => $ref,
+  );
+
+  $kernel->yield( '_cache_json',
+    $network, $trawler->info->servername, $s_js, $n_js
+  );
+
+  ## Replace this finished trawler
+  my $this_trawler_cf = $cfg->{Networks}->{$network}->{$server};
+  unless (defined $this_trawler_cf) {
+    log_to('irc', 'warn', 
+      "Cannot readd trawler: missing conf: $network: $server"
+    );
+    return
+  }
+  my %trawlopts = %$this_trawler_cf;
+  my $newtrawl = create_trawler(Server => $server, %trawlopts);
+
+  ## Push the replacement back to $obj->{Trawlers}->{$network}
+  push(@{ $obj->{Trawlers}->{$network} }, $newtrawl);
+  log_to('irc', 'info', "Spawned fresh trawler: $network: $server");
+  
+  ## If this is the only trawler, we can reschedule it now:
+  unless (@{ $obj->{Trawlers}->{$network} } > 1) {
+    my $next_run_at  = time + ($opts->{interval} || 600);
+    $kernel->alarm_add(
+      '_trawler_run', $next_run_at, $newtrawl
+    );
+    log_to('irc', 'info', "Scheduling single trawler for $network");
+  }
+}
+
+sub _cache_json {
+  my $kernel = $_[KERNEL];
+  my ($network, $server, $s_obj, $n_obj) = @_[ARG0 .. $#_];  
+  cache_json( $s_obj->dump, $network, $server );
+  cache_json( $n_obj->dump, $network );
+  log_to('irc', 'info',
+    "Cached JSON: $network ($server)"
+  );
+}
+
+
+## Helpers
+
 sub create_trawler {
   my %trawlopts = @_;
   my $this_cf = \%trawlopts;
@@ -552,77 +583,49 @@ sub create_trawler {
   return $trawler
 }
 
-sub _start {
-  my ($kernel, $heap) = @_[KERNEL, HEAP];
-  $kernel->alias_set('indexerhttp');
-  
-  $kernel->sig('INT', '_sig_int');
-  $kernel->sig('TERM', '_sig_int');
+sub cache_json {
+  my ($data, $network, $server) = @_;
 
-  log_to('session', 'info', 'Session started');
+  if ($server) {
+    ## store a server's json
 
-  ## init httpd
-  my @htstates = poco_cfg_httpd();
-  
-  $kernel->call( $_[SESSION], '_init_nets' );
-  
-  ## add states from $state->{htevents}
-  $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};  
+    if (tied %JSCache) {
+      ## using CacheDB
+      my $thiskey = $network.'%'.$server;
+      $JSCache{$thiskey} = $data;
+    } else {
+      $jsmemcache->{Servers}->{$network}->{$server} = $data;
+    }
+
+  } else {
+    ## store a network's json
+
+    if (tied %JSCache) {
+      $JSCache{$network} = $data;
+    } else {
+      $jsmemcache->{Networks}->{$network} = $data;
+    }
+
+  }
 }
 
-sub _init_nets {
-  my ($kernel, $heap) = @_[KERNEL, HEAP];
+sub restore_json {
+  my ($network, $server) = @_;
 
-  ## called by either _start or _rehash
-  
-  ## clear objs if we have any
-  $obj->{Trawlers} = { };
+  if ($server) {
 
-  my($total_nets, $total_servers);
-  NETWORK: for my $network (keys %{ $cfg->{Networks} }) {
-    ++$total_nets;
-    my $this_net = $cfg->{Networks}->{$network};
-    SERVER: for my $server (keys %$this_net) {
-      ++$total_servers;
-      my $this_cf = $this_net->{$server};
-      
-      log_to('irc', 'info', "Init trawler: $network -> $server");
+    if (tied %JSCache) {
+      my $thiskey = $network.'%'.$server;
+      return $JSCache{$thiskey}
+    } else {
+      return unless exists $jsmemcache->{Servers}->{$network};
+      return $jsmemcache->{Servers}->{$network}->{$server}
+    }
 
-      my %trawlopts = %$this_cf;
-      my $trawler = create_trawler(Server => $server, %trawlopts);
-      
-      ## push to network's trawler array
-      push( @{ $obj->{Trawlers}->{$network} }, $trawler);
-      
-      log_to('irc', 'debug', "Trawler constructed for $server");      
-    } ## SERVER
-          
-    ## add to chk pool
-    $state->{timers}->{trawlers}->{$network} = {
-      LastRun => 0,
-    };
-
-  } ## NETWORK
-  
-  $kernel->alarm('_timer_chk' => time + 3);
-
-  log_to('irc', 'info',
-    "Trawling $total_servers servers across $total_nets networks"
-  );
-
-  $state->{stats}->{TotalNetworks} = $total_nets;
-  $state->{stats}->{TotalServers}  = $total_servers;  
-}
-
-sub _sig_int {
-  $_[KERNEL]->yield('_stop');
-}
-
-sub _stop {
-  log_to('session', 'warn', "_stop received");
-  unlink($cfg->{CacheDB}) if tied %JSCache;
-  undef %JSCache;
-  $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
+  } else {
+    return $JSCache{$network} if tied %JSCache;
+    return $jsmemcache->{Networks}->{$network}
+  }  
 }
 
 ## HTTP states

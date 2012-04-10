@@ -1,5 +1,5 @@
 package IRC::Indexer;
-our $VERSION = '0.01_01';
+our $VERSION = '0.01';
 
 ## stub! for now ..
 
@@ -37,10 +37,16 @@ A set of modules and utilities useful for trawling IRC networks,
 collecting information, and exporting it to portable formats for use in 
 Web frontends and other applications.
 
-As of this writing, known-working frontends are B<ircindexer-single> and 
-B<ircindexer-server-json>.
+L<ircindexer-server-json> serves as an example of how to use the trawler 
+system to index IRC networks; it is usable as-is to trawl sets of IRC 
+servers belonging to configured networks and serve JSON-serialized 
+network stats via HTTP.
 
-See the B<perldoc> for L<IRC::Indexer::Trawl::Bot> for more about 
+L<ircindexer-single> can be used to trawl a single server in one shot, 
+exporting to YAML, JSON, or Perl.
+See the documentation or C<ircindexer -h> for details.
+
+See the perldoc for L<IRC::Indexer::Trawl::Bot> for more about 
 using the trawl bot itself as part of other POE-enabled applications.
 
 See L<IRC::Indexer::POD::ServerSpec> and 

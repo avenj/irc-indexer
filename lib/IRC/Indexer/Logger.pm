@@ -105,7 +105,8 @@ IRC::Indexer::Logger - simple interface to Log::Handler
 Simplified construction of Log::Handler instances for IRC::Indexer 
 frontends.
 
-See the SYNOPSIS for usage details.
+See the SYNOPSIS for usage details and L<Log::Handler> for more 
+about using the log object itself.
 
 =head1 AUTHOR
 

@@ -24,8 +24,14 @@ DESCRIPTION
     collecting information, and exporting it to portable formats for use in
     Web frontends and other applications.
 
-    As of this writing, known-working frontends are ircindexer-single and
-    ircindexer-server-json.
+    ircindexer-server-json serves as an example of how to use the trawler
+    system to index IRC networks; it is usable as-is to trawl sets of IRC
+    servers belonging to configured networks and serve JSON-serialized
+    network stats via HTTP.
+
+    ircindexer-single can be used to trawl a single server in one shot,
+    exporting to YAML, JSON, or Perl. See the documentation or `ircindexer
+    -h' for details.
 
     See the perldoc for IRC::Indexer::Trawl::Bot for more about using the
     trawl bot itself as part of other POE-enabled applications.

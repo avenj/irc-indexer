@@ -11,11 +11,15 @@ use Storable qw/dclone/;
 
 use YAML::XS ();
 
-sub new {
-  my $self = {};
-  my $class = shift;
-  bless $self, $class;
-  return $self  
+sub new { bless {}, shift }
+
+sub slurp {
+  my ($self, $path) = @_;
+  my $slurped;
+  open my $fh, '<:encoding(utf8)', $path or croak "open failed: $!";
+  { local $/; $slurped = <$fh> }
+  close $fh;
+  return $slurped
 }
 
 sub parse_conf {
@@ -85,15 +89,6 @@ sub find_nets {
   );
 
   return wantarray ? @found : \@found ;
-}
-
-sub slurp {
-  my ($self, $path) = @_;
-  my $slurped;
-  open my $fh, '<:encoding(utf8)', $path or croak "open failed: $!";
-  { local $/; $slurped = <$fh> }
-  close $fh;
-  return $slurped
 }
 
 
@@ -224,16 +219,14 @@ IRC::Indexer::Conf - Handle Indexer configuration files
 
 =head1 SYNOPSIS
 
-  my $conf = IRC::Indexer::Conf->new;
-  
-  my $cfhash = $conf->parse_conf($path);
+  my $cfhash = IRC::Indexer::Conf->parse_conf($path);
   
   ## Recursively read server spec files:
-  my $nethash = $conf->parse_nets($specfile_dir);
+  my $nethash = IRC::Indexer::Conf->parse_nets($specfile_dir);
 
 =head1 DESCRIPTION
 
-Handle IRC::Indexer configuration files in YAML format.
+Handles IRC::Indexer configuration files in YAML format.
 
 This module can also generate example configuration files.
 
