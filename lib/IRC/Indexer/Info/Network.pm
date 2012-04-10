@@ -36,7 +36,10 @@ sub new {
 
 ## Simple read-only accessors:
 
-sub dump {
+## Remain compatible with Info::Server interface:
+sub info { netinfo(@_) }
+sub dump { netinfo(@_) }
+sub netinfo {
   my ($self) = @_;
   return $self->{Network}
 }
@@ -148,7 +151,7 @@ Merges server information from a Trawl::Bot run.
 
 Argument must be a L<IRC::Indexer::Info::Server> object.
 
-=head3 dump
+=head3 netinfo
 
 Returns the network information hash.
 
