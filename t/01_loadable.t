@@ -1,6 +1,8 @@
-use Test::More tests => 9;
+use Test::More tests => 10;
 
 BEGIN {
+  use_ok( 'IRC::Indexer' );
+
   use_ok( 'IRC::Indexer::Trawl::Bot' );
   use_ok( 'IRC::Indexer::Trawl::Multi') ;
 
