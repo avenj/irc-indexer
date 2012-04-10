@@ -23,7 +23,8 @@ same conventions apply.
   GlobalUsers => INT
   OperCount   => INT
 
-  Servers     => HASH
+  Servers     => HASH   (see below)
+  LastServer  => STRING (last server trawled for this network)
   
   HashChans   => HASH
   ListChans   => ARRAY

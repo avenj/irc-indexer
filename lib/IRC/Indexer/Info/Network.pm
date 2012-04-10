@@ -25,6 +25,9 @@ sub new {
     ListChans   => [],
     HashChans   => {},
     
+    ListLinks  => [],
+    LastServer => undef,
+    
     ConnectedAt => undef,
     FinishedAt  => undef,
   };
@@ -80,6 +83,11 @@ sub finishedat {
   return $self->{Network}->{FinishedAt}
 }
 
+sub lastserver {
+  my ($self) = @_;
+  return $self->{Network}->{LastServer}
+}
+
 sub add_server {
   my ($self, $info) = @_;
   ## given a Info::Server object (or subclass), merge to this Network
@@ -103,6 +111,7 @@ sub add_server {
   $network->{ConnectedAt} = $info->connectedat;
   $network->{FinishedAt}  = $info->finishedat;
   $network->{ListLinks}   = $info->links;
+  $network->{LastServer}  = $name;
 }
 
 1;
@@ -153,6 +162,10 @@ Returns the timestamp of the last run for this network.
 
 Returns a hash keyed on server name.
 
+=head3 lastserver
+
+Returns the name of the last server added to this network.
+
 =head3 motd_for
 
 Returns the MOTD for a specified server:
@@ -181,5 +194,7 @@ L<IRC::Indexer::Trawl::Bot>
 =head1 AUTHOR
 
 Jon Portnoy <avenj@cobaltirc.org>
+
+L<http://www.cobaltirc.org>
 
 =cut
