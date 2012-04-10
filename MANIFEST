@@ -18,6 +18,7 @@ lib/IRC/Indexer/Info/Network.pm
 lib/IRC/Indexer/Info/Server.pm
 MANIFEST			This list of files
 Makefile.PL
+INSTALL
 README
 META.yml
 META.json

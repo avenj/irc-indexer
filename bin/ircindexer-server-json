@@ -203,6 +203,7 @@ sub get_cfg {
     tie %JSCache, "DB_File", $cfg->{CacheDB},
       O_CREAT|O_RDWR, 0644, $DB_HASH
       or die "Could not tie DB: $cfg->{CacheDB}: $!" ;    
+    %JSCache = ();
   }
 
   ## Read server specifications:  
@@ -542,6 +543,7 @@ sub _start {
   $kernel->alias_set('indexerhttp');
   
   $kernel->sig('INT', '_sig_int');
+  $kernel->sig('TERM', '_sig_int');
 
   log_to('session', 'info', 'Session started');
 
