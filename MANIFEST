@@ -20,6 +20,7 @@ MANIFEST			This list of files
 Makefile.PL
 INSTALL
 README
+Changes
 META.yml
 META.json
 t/01_loadable.t

@@ -63,11 +63,13 @@ sub users {
   return $self->{Network}->{GlobalUsers}
 }
 
+sub listchans { channels(@_) }
 sub channels {
   my ($self) = @_;
   return $self->{Network}->{ListChans}
 }
 
+sub hashchans { chanhash(@_) }
 sub chanhash {
   my ($self) = @_;
   return $self->{Network}->{HashChans}
@@ -127,11 +129,11 @@ IRC::Indexer::Info::Network - Network information class for IRC::Indexer
 
   my $network = IRC::Indexer::Info::Network->new;
   ## Get ::Info::Server object from finished trawl bot:
-  my $servinf  = $trawler->info;
+  my $info_obj  = $trawler->info;
   ## Feed it to add_server:
-  $network->add_server( $servinf );
+  $network->add_server( $info_obj );
   ## Get a network info hash:
-  my $ref = $network->dump;
+  my $net_hash = $network->dump;
 
 =head1 DESCRIPTION
 
