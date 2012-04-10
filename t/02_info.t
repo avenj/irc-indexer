@@ -1,4 +1,4 @@
-use Test::More tests => 53;
+use Test::More tests => 55;
 
 BEGIN {
   use_ok( 'IRC::Indexer::Info::Server' );
@@ -95,6 +95,12 @@ is_deeply( $listchans, $expected_listchans, 'listchans sort order' );
 my $dump;
 ok( $dump = $server->info, 'info()' );
 ok( ref $dump eq 'HASH', 'info() is a hash' );
+
+## Should be able to create an identical obj
+my $identical = new_ok( 'IRC::Indexer::Info::Server' => [
+  FromHash => $dump,
+] );
+is( $identical->server, 'eris.oppresses.us', 'imported server()' );
 
 ## Info::Network
 

@@ -5,13 +5,24 @@ use strict;
 use warnings;
 use Carp;
 
+use Storable qw/dclone/;
+
 ## A single server.
 
 sub new {
   my $self = {};
   my $class = shift;
   bless $self, $class;
-  $self->{NetInfo} = {};
+  my %args = @_;
+  $args{lc $_} = delete $args{$_} for keys %args;
+  
+  if ($args{fromhash} && ref $args{fromhash} eq 'HASH') {
+    ## given a previously-created hash
+    ## does no validation currently
+    $self->{NetInfo} = dclone($args{fromhash});
+  } else {
+    $self->{NetInfo} = {};
+  }
   return $self
 }
 
@@ -174,11 +185,18 @@ IRC::Indexer::Info::Server - Server information class for IRC::Indexer
 
 =head1 SYNOPSIS
 
+  ## Create new blank server info obj:
   my $info = IRC::Indexer::Info::Server->new;
+
+  . . . add trawler data .  . .
   
-  . . .
-  
+  ## Get server's info as hash:
   my $ref = $info->netinfo;
+  
+  ## Construct from previously-exported hash:
+  my $info = IRC::Indexer::Info::Server->new(
+    FromHash => $previous->netinfo(),
+  );
   
   ## See below for other methods.
 
