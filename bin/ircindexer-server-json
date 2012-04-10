@@ -4,9 +4,9 @@ use strict;
 use warnings;
 
 ## FIXME sighup handler
-##  stop and clear all existing trawlers
-##  reload network cfg
-##  re-feed trawler hash
+##  stop and clear all existing trawlers in $obj
+##  clear and reload network cfg in $cfg
+##  re-init trawlers
 
 use Compress::Zlib;
 use DB_File;
@@ -300,6 +300,9 @@ sub poco_init_session {
       main => [ qw/
         _start
         _stop
+
+        _init_nets
+
         _timer_chk
         _trawler_run
         _trawler_process
@@ -561,9 +564,20 @@ sub _start {
   ## init httpd
   my @htstates = poco_cfg_httpd();
   
-  ## add states from $state->{htevents}
-  $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};
+  $kernel->call( $_[SESSION], '_init_nets' );
   
+  ## add states from $state->{htevents}
+  $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};  
+}
+
+sub _init_nets {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+
+  ## called by either _start or _rehash
+  
+  ## clear objs if we have any
+  $obj->{Trawlers} = { };
+
   my($total_nets, $total_servers);
   NETWORK: for my $network (keys %{ $cfg->{Networks} }) {
     ++$total_nets;
@@ -597,7 +611,7 @@ sub _start {
   );
 
   $state->{stats}->{TotalNetworks} = $total_nets;
-  $state->{stats}->{TotalServers}  = $total_servers;
+  $state->{stats}->{TotalServers}  = $total_servers;  
 }
 
 sub _sig_int {
