@@ -199,7 +199,10 @@ IRC::Indexer::Trawl::Multi - Trawl multiple IRC servers
 
 =head1 DESCRIPTION
 
-A simple multiplexer for L<IRC::Indexer::Trawl::Bot> instances.
+A simple manager for groups of L<IRC::Indexer::Trawl::Bot> instances.
+
+This is mostly an example; it is not used by any of the included 
+controllers and is not at all sophisticated.
 
 Given an array (reference) of server addresses, it will spawn trawlers 
 for each server that run in parallel; when they're all finished, 

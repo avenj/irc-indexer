@@ -48,7 +48,7 @@ sub new {
   $self->{ircserver} = $args{server} 
     || croak "No Server specified in new" ;
   $self->{ircport} = $args{port} || 6667 ;
-  $self->{ircnick} = $args{nickname} || 'irctrawl'.(int rand 666);
+  $self->{ircnick} = $args{nickname} || 'iindx'.(int rand 666);
   
   $self->{bindaddr} = $args{bindaddr} if $args{bindaddr};
   $self->{useipv6}  = $args{ipv6} || 0;
@@ -467,7 +467,8 @@ The B<info()> method returns the L<IRC::Indexer::Info::Server> object.
 
 The B<dump()> method returns a hash reference containing network 
 information (or undef if not done); see L<IRC::Indexer::Info::Server> 
-for details.
+for details. This is the hash returned by 
+L<IRC::Indexer::Info::Server/netinfo>
 
 The trawler attempts to be polite, spacing out requests for LINKS, 
 LUSERS, and LIST; you can fine-tune the interval between commands by 
