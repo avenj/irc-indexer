@@ -593,7 +593,8 @@ sub _sig_int {
 
 sub _stop {
   log_to('session', 'warn', "_stop received");
-  untie %JSCache if tied %JSCache;
+  unlink($cfg->{CacheDB}) if tied %JSCache;
+  undef %JSCache;
   $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
 }
 
@@ -719,10 +720,9 @@ sub h_servlist {
   my $servlist;
   
   if (tied %JSCache) {
-    my @cachekeys = grep { 
-        index($_, "${network}%") == 0 
-      } keys %JSCache;
-    $servlist = [ map { s/^$network%// } @cachekeys ];
+    my @cachekeys = grep { /^$network%/ } keys %JSCache;
+    map { s/^$network%// } @cachekeys;
+    $servlist = [ @cachekeys ];
   } else {
     $servlist = [ keys %{ $jsmemcache->{Servers}->{$network}//{} } ];
   }
@@ -814,18 +814,6 @@ sub h_network {
     return
   }
 
-  ## if this is a /network/<net>/server, hand it off:
-  if ($chunks[1] && $chunks[1] eq "server") {
-    my $server = $chunks[2];
-    unless ($server) {
-      ## supply available server list:
-      $kernel->yield( h_servlist => $req, $resp, $network );
-      return
-    }
-    $kernel->yield( h_server => $req, $resp, $network, $server );
-    return
-  }
-
   my $json;
   ## We don't know this network:
   unless ( $json = restore_json($network) ) {
@@ -839,7 +827,18 @@ sub h_network {
     $kernel->yield( h_error_404 => $req, $resp, $reason );
     return
   }
-    
+
+  ## if this is a /network/<net>/server, hand it off:
+  if ($chunks[1] && $chunks[1] eq "server") {
+    my $server = $chunks[2];
+    unless ($server) {
+      ## supply available server list:
+      $kernel->yield( h_servlist => $req, $resp, $network );
+      return
+    }
+    $kernel->yield( h_server => $req, $resp, $network, $server );
+    return
+  }    
 
   ## otherwise, try to serve a net hash:
   
