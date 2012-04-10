@@ -35,7 +35,8 @@ These are documented further in L<IRC::Indexer::POD::ServerSpec>.
 
   Servers => {
     SERVER-NAME => {
-      MOTD => [ ARRAY of MOTD lines ]
+      TrawledAt => TIME
+      MOTD => [ ARRAY of MOTD lines ]  ## OPTIONAL
     }
   }
 
@@ -44,9 +45,6 @@ belonging to this network that have been trawled.
 
 It is keyed on actual reported server name (the ServerName field of a 
 Server export); each server is a nested hash.
-
-As of IRC::Indexer-0.01, the only per-server key is B<MOTD>, containing 
-the array of lines composing the server's MOTD (without newlines).
 
 =head1 AUTHOR
 

@@ -164,6 +164,10 @@ sub _stop {
 #  carp "DEBUG trawl session stop"
 }
 
+sub DESTROY {
+  $_[0]->shutdown($poe_kernel);
+}
+
 sub shutdown {
   my ($self, $kernel) = @_[OBJECT, KERNEL];
   

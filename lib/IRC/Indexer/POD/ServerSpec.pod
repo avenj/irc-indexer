@@ -114,7 +114,7 @@ ListChans is an array whose members are arrays containing three
 elements: channel name, channel users, channel topic.
 
 L<IRC::Indexer> generates ListChans if $trawler->info->channels() is 
-called.
+called; it is not guaranteed to be available.
 
 ListChans is provided as a convenience to frontends, so they do not 
 need to execute possibly expensive sort routines themselves.

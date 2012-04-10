@@ -21,7 +21,8 @@ sub new {
 
 sub dump {
   my ($self) = @_;
-  return $self->{Output}
+  my $output = $self->{Output};
+  return $output
 }
 
 sub write {

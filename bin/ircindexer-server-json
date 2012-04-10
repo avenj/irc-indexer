@@ -33,6 +33,8 @@ use IRC::Indexer::Info::Network;
 
 use IRC::Indexer::Output::JSON;
 
+#use Devel::Size qw/total_size/;
+
 my $opts = {
   help => sub {
     print(
@@ -128,7 +130,8 @@ my $cfg = {
   Networks => {},
   BindAddr   => '0.0.0.0',
   ServerPort => 8700,
-  CacheDB  => undef,
+  CacheDB    => undef,
+  ListChans  => undef,
   
   LogFile  => undef,
   LogLevel => undef,
@@ -201,24 +204,34 @@ sub get_cfg {
   $cfg->{ServerPort} //= 8700;
   
   if ($cfg->{CacheDB}) {
-    my $db = tie %JSCache, "DB_File", $cfg->{CacheDB},
-      O_CREAT|O_RDWR, 0644, $DB_HASH
-      or die "Could not tie DB: $cfg->{CacheDB}: $!" ;
-    
-    $db->filter_fetch_value( sub {
-      $_ = uncompress($_);
-    });
-    
-    $db->filter_store_value( sub {
-      $_ = compress($_);
-    });
-        
-    %JSCache = ();
+    unlink($cfg->{CacheDB});
+    ## test cachedb open/close
+    db_open();
+    db_close();
   }
 
   ## Read server specifications:  
   my $nethash = $conf->parse_nets($cfhash->{NetworkDir});
   $cfg->{Networks} = $nethash;
+}
+
+sub db_open {
+  return unless $cfg->{CacheDB};
+  tie %JSCache, "DB_File", $cfg->{CacheDB},
+      O_CREAT|O_RDWR, 0644, $DB_HASH
+    or die "Could not tie DB: $cfg->{CacheDB}: $!" ;
+    
+  (tied %JSCache)->filter_fetch_value( sub {
+      $_ = uncompress($_)
+  });
+    
+  (tied %JSCache)->filter_store_value( sub {
+      $_ = compress($_)
+  });
+}
+
+sub db_close {
+  untie %JSCache;
 }
 
 sub log_to {
@@ -385,8 +398,7 @@ sub _sig_int {
 
 sub _stop {
   log_to('session', 'warn', "_stop received");
-  unlink($cfg->{CacheDB}) if tied %JSCache;
-  undef %JSCache;
+  db_close();
   $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
 }
 
@@ -489,8 +501,10 @@ sub _trawler_process {
       "Cannot _trawler_process unblessed trawler for $network"
     );
   }
+  
+  my $info = $trawler->info;
 
-  my $server = $trawler->info->connectedto;
+  my $server = $info->connectedto;
 
   log_to('irc', 'info', 
     "Completed trawler: $network ($server)"
@@ -504,49 +518,54 @@ sub _trawler_process {
   }
   
   ## sort ListChans:
-  $trawler->info->channels;
+  $info->channels if $cfg->{ListChans};
 
   ## feed to JSONify
+  my $netinfo = $info->clone;
   my $s_js = IRC::Indexer::Output::JSON->new(
-    Input => $trawler->info->netinfo,
+    Input => $netinfo,
   );
 
   ## create an Info::Network if we don't have one
   $obj->{NetInfo}->{$network} = IRC::Indexer::Info::Network->new()
     unless blessed $obj->{NetInfo}->{$network};
   
+#  warn "DEBUG SIZEOF NetInfo ".total_size($obj->{NetInfo});
+  
   ## feed it this server's Info object:
-  $obj->{NetInfo}->{$network}->add_server($trawler->info);
+  $obj->{NetInfo}->{$network}->add_server($info);
 
   my $ref = $obj->{NetInfo}->{$network}->netinfo;
   my $n_js = IRC::Indexer::Output::JSON->new(
     Input => $ref,
   );
 
+  my $server_name = $info->servername;
   $kernel->yield( '_cache_json',
-    $network, $trawler->info->servername, $s_js, $n_js
+    $network, $server_name, $s_js->dump, $n_js->dump
   );
-
+  
   ## Replace this finished trawler
   my $this_trawler_cf = $cfg->{Networks}->{$network}->{$server};
   unless (defined $this_trawler_cf) {
+    ## May have disappeared in a rehash.
     log_to('irc', 'warn', 
-      "Cannot readd trawler: missing conf: $network: $server"
+      "Not readding trawler: no conf: $network: $server"
     );
     return
   }
   my %trawlopts = %$this_trawler_cf;
-  my $newtrawl = create_trawler(Server => $server, %trawlopts);
+  $trawler = create_trawler(Server => $server, %trawlopts);
 
   ## Push the replacement back to $obj->{Trawlers}->{$network}
-  push(@{ $obj->{Trawlers}->{$network} }, $newtrawl);
+  push(@{ $obj->{Trawlers}->{$network} }, $trawler);
   log_to('irc', 'info', "Spawned fresh trawler: $network: $server");
   
   ## If this is the only trawler, we can reschedule it now:
   unless (@{ $obj->{Trawlers}->{$network} } > 1) {
     my $next_run_at  = time + ($opts->{interval} || 600);
     $kernel->alarm_add(
-      '_trawler_run', $next_run_at, $newtrawl
+      '_trawler_run', $next_run_at, $trawler
     );
     log_to('irc', 'info', "Scheduling single trawler for $network");
   }
@@ -554,9 +573,9 @@ sub _trawler_process {
 
 sub _cache_json {
   my $kernel = $_[KERNEL];
-  my ($network, $server, $s_obj, $n_obj) = @_[ARG0 .. $#_];  
-  cache_json( $s_obj->dump, $network, $server );
-  cache_json( $n_obj->dump, $network );
+  my ($network, $server, $s_hash, $n_hash) = @_[ARG0 .. $#_];  
+  cache_json( $s_hash, $network, $server );
+  cache_json( $n_hash, $network );
   log_to('irc', 'info',
     "Cached JSON: $network ($server)"
   );
@@ -589,10 +608,12 @@ sub cache_json {
   if ($server) {
     ## store a server's json
 
-    if (tied %JSCache) {
+    if ($cfg->{CacheDB}) {
       ## using CacheDB
       my $thiskey = $network.'%'.$server;
+      db_open();
       $JSCache{$thiskey} = $data;
+      db_close();
     } else {
       $jsmemcache->{Servers}->{$network}->{$server} = $data;
     }
@@ -600,8 +621,10 @@ sub cache_json {
   } else {
     ## store a network's json
 
-    if (tied %JSCache) {
+    if ($cfg->{CacheDB}) {
+      db_open();
       $JSCache{$network} = $data;
+      db_close();
     } else {
       $jsmemcache->{Networks}->{$network} = $data;
     }
@@ -614,17 +637,26 @@ sub restore_json {
 
   if ($server) {
 
-    if (tied %JSCache) {
+    if ($cfg->{CacheDB}) {
       my $thiskey = $network.'%'.$server;
-      return $JSCache{$thiskey}
+      db_open();
+      my $data = $JSCache{$thiskey};
+      db_close();
+      return $data
     } else {
       return unless exists $jsmemcache->{Servers}->{$network};
       return $jsmemcache->{Servers}->{$network}->{$server}
     }
 
   } else {
-    return $JSCache{$network} if tied %JSCache;
-    return $jsmemcache->{Networks}->{$network}
+    if ($cfg->{CacheDB}) {
+      db_open();
+      my $data = $JSCache{$network};
+      db_close();
+      return $data
+    } else { 
+      return $jsmemcache->{Networks}->{$network}
+    }
   }  
 }
 
@@ -749,8 +781,10 @@ sub h_servlist {
 
   my $servlist;
   
-  if (tied %JSCache) {
+  if ($cfg->{CacheDB}) {
+    db_open();
     my @cachekeys = grep { /^$network%/ } keys %JSCache;
+    db_close();
     map { s/^$network%// } @cachekeys;
     $servlist = [ @cachekeys ];
   } else {
@@ -782,8 +816,10 @@ sub h_netlist {
 
   my $netlist;
   
-  if (tied %JSCache) {
+  if ($cfg->{CacheDB}) {
+    db_open();
     $netlist = [ grep { index($_, '%') == -1 } keys %JSCache ];
+    db_close();
   } else {
     $netlist = [ keys %{ $jsmemcache->{Networks}//{} } ];
   }
