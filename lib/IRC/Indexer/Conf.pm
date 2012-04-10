@@ -144,6 +144,14 @@ NetworkDir: /home/ircindex/networks
 ## This trades some performance for significant memory savings.
 CacheDB: /home/ircindex/.indexerjson.db
 
+## ListChans:
+##
+## If ListChans is enabled, the server will create sorted lists of 
+## channels as documented in IRC::Indexer::POD::ServerSpec
+##
+## Expensive in terms of CPU and space.
+ListChans: 0
+
 ## ServerPort:
 ##
 ## Port to run this HTTPD instance on.
