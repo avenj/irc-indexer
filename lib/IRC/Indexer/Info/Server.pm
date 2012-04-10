@@ -134,6 +134,12 @@ sub links {
   ## FIXME better links handling
 }
 
+sub chancount { totalchans(@_) }
+sub totalchans {
+  my ($self) = @_;
+  return $self->netinfo->{ChannelCount};
+}
+
 sub listchans { channels(@_) }
 sub channels {
   my ($self, $chanlist) = @_;
@@ -160,6 +166,7 @@ sub add_channel {
     Topic => $topic,
     Users => $users,
   };
+  ++$self->netinfo->{ChannelCount};
   return $channel
 }
 
@@ -288,6 +295,13 @@ With no arguments, returns an array reference containing LINKS output
 
 If an argument is specified, it should be an array reference containing 
 raw LINKS lines.
+
+=head3 totalchans
+
+Get the total number of channels found in B<LIST>.
+
+This is calculated from L</chanhash> and cannot be set directly; use 
+L</add_channel> to add a channel.
 
 =head3 channels
 

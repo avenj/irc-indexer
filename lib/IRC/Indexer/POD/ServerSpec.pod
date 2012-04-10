@@ -44,9 +44,10 @@ I<null>.
   ConnectedTo
   ServerName
   NetName
+  MOTD
   GlobalUsers
   OperCount
-  MOTD
+  ChanCount
   HashChans
   ListChans
   ListLinks
@@ -88,6 +89,7 @@ newlines.
 
 =head2 Channels
 
+  ChanCount => INT
   ListChans => ARRAY (of arrays)
   HashChans => HASH
 

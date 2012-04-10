@@ -118,6 +118,7 @@ sub add_server {
   ## these can all be overriden network-wide:
   $network->{GlobalUsers} = $info->users;
   $network->{OperCount}   = $info->opers;
+  $network->{ChanCount}   = $info->totalchans;
   $network->{ListChans}   = $info->channels;
   $network->{HashChans}   = $info->chanhash;
   $network->{ConnectedAt} = $info->connectedat;
