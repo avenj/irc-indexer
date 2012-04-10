@@ -1,8 +1,10 @@
-use Test::More tests => 48;
+use Test::More tests => 53;
 
 BEGIN {
   use_ok( 'IRC::Indexer::Info::Server' );
   use_ok( 'IRC::Indexer::Info::Network' );
+  
+  use_ok( 'IRC::Indexer::Output::JSON' );
 }
 
 ## Info::Server
@@ -129,3 +131,13 @@ is_deeply( $listchans, $expected_listchans, 'network channels() compare' );
 $hashchans = undef;
 ok( $hashchans = $network->chanhash, 'network chanhash() get' );
 is_deeply( $hashchans, $expected_hashchans, 'network chanhash() compare' );
+
+my $server_json = new_ok( 'IRC::Indexer::Output::JSON' => 
+  [ Input => $server->netinfo ]
+);
+ok( $server_json->dump, 'JSONify server hash' );
+
+my $net_json = new_ok( 'IRC::Indexer::Output::JSON' =>
+  [ Input => $network->info ]
+);
+ok( $net_json->dump, 'JSONify network hash' );
