@@ -3,12 +3,12 @@ use 5.12.1;
 use strict;
 use warnings;
 
-## FIXME optional on-disk cache / persistency
-## need:
-##  methods to store and retrieve
-##  methods can determine whether to use DB or not
-##    store networks keyed on network name
-##    store servers keyed on NETNAME%servername
+## FIXME sighup handler
+##  stop and clear all existing trawlers
+##  reload network cfg
+##  re-feed trawler hash
+
+use Compress::Zlib;
 use DB_File;
 my %JSCache;
 
@@ -117,8 +117,8 @@ my $state = {
     TrawlersExecuted => 0,
     TrawlersCreated  => 0,
     
-    LastTrawl        => 0,
-    LastTrawledServer  =>
+    LastTrawl         => 0,
+    LastTrawledServer => undef,
     
     HTTP_Responses   => 0,
   },
@@ -201,9 +201,18 @@ sub get_cfg {
   $cfg->{ServerPort} //= 8700;
   
   if ($cfg->{CacheDB}) {
-    tie %JSCache, "DB_File", $cfg->{CacheDB},
+    my $db = tie %JSCache, "DB_File", $cfg->{CacheDB},
       O_CREAT|O_RDWR, 0644, $DB_HASH
-      or die "Could not tie DB: $cfg->{CacheDB}: $!" ;    
+      or die "Could not tie DB: $cfg->{CacheDB}: $!" ;
+    
+    $db->filter_fetch_value( sub {
+      $_ = uncompress($_);
+    });
+    
+    $db->filter_store_value( sub {
+      $_ = compress($_);
+    });
+        
     %JSCache = ();
   }
 
@@ -335,7 +344,7 @@ sub _trawler_process {
 
   ## feed to JSONify
   my $s_js = IRC::Indexer::Output::JSON->new(
-    Input => $trawler->dump,
+    Input => $trawler->info->netinfo,
   );
 
   ## create an Info::Network if we don't have one
@@ -345,13 +354,13 @@ sub _trawler_process {
   ## feed it this server's Info object:
   $obj->{NetInfo}->{$network}->add_server($trawler->info);
 
-  my $ref = $obj->{NetInfo}->{$network}->dump;
+  my $ref = $obj->{NetInfo}->{$network}->netinfo;
   my $n_js = IRC::Indexer::Output::JSON->new(
     Input => $ref,
   );
 
   $kernel->yield( '_cache_json',
-    $network, $server, $s_js, $n_js
+    $network, $trawler->info->servername, $s_js, $n_js
   );
 
   ## Replace this finished trawler
