@@ -460,7 +460,7 @@ sub _timer_chk {
         }
       } else {
         ## Trawler still pending or running.
-        my $servername = $trawler->info->connectedto;
+        my $servername = $trawler->trawler_for;
         push(@pending, $servername);
       }
       ++$idx;
@@ -481,7 +481,7 @@ sub _trawler_run {
     log_to('irc', 'warn', "_trawler_run received unblessed trawler");
     return
   }
-  my $server = $trawler->info->connectedto;
+  my $server = $trawler->trawler_for;
   log_to('irc', 'debug', "Trawler run issued for $server");
   $trawler->run;
 
@@ -502,9 +502,7 @@ sub _trawler_process {
     );
   }
   
-  my $info = $trawler->info;
-
-  my $server = $info->connectedto;
+  my $server = $trawler->trawler_for;
 
   log_to('irc', 'info', 
     "Completed trawler: $network ($server)"
@@ -516,6 +514,8 @@ sub _trawler_process {
     );
     next
   }
+
+  my $info = $trawler->info;
   
   ## sort ListChans:
   $info->channels if $cfg->{ListChans};

@@ -36,9 +36,6 @@ sub new {
 
   $self->{State} = {};
   
-  $self->{Serv} = IRC::Indexer::Info::Server->new;
-  $self->{Serv}->startedat( time() );
-
   my %args = @_;
   $args{lc $_} = delete $args{$_} for keys %args;
 
@@ -55,13 +52,16 @@ sub new {
   $self->{bindaddr} = $args{bindaddr} if $args{bindaddr};
   $self->{useipv6}  = $args{ipv6} || 0;
 
-  $self->{Serv}->connectedto( $self->{ircserver} );
-
   return $self
 }
 
+sub trawler_for { return $_[0]->{ircserver} }
+
 sub run {
   my ($self) = @_;
+
+  $self->{Serv} = IRC::Indexer::Info::Server->new;
+  $self->{Serv}->connectedto( $self->{ircserver} );
   
   POE::Session->create(
     object_states => [
@@ -101,6 +101,8 @@ sub run {
          'irc_323',
     ] ],
   );
+
+  $self->{Serv}->startedat( time() );
 }
 
 sub verbose {
@@ -124,6 +126,7 @@ sub info {
 
 sub failed {
   my ($self, $reason) = @_;
+  return unless ref $self->info;
   if ($reason) {
     $self->info->status('FAIL');
     $self->info->failed($reason);
@@ -142,7 +145,8 @@ sub done {
     $self->info->status('DONE');
     $self->info->finishedat(time());
   }
-  
+
+  return unless ref $self->info;  
   return unless defined $self->info->status 
          and $self->info->status ~~ [qw/DONE FAIL/];
   return $self->info->status
@@ -151,6 +155,7 @@ sub done {
 sub dump {
   my ($self) = @_;
   ## return() if we're not done:
+  return unless ref $self->info;
   return unless defined $self->info->status 
          and $self->info->status ~~ [qw/DONE FAIL/];
   ## else return hashref of net info (or failure status)
@@ -498,6 +503,10 @@ seconds).
 
 =head2 METHODS
 
+=head3 trawler_for
+
+Returns the server this trawler was constructed for.
+
 =head3 run
 
 Start the trawler session.
@@ -515,6 +524,8 @@ Returns boolean true if the trawler instance has finished.
 
 Returns the L<IRC::Indexer::Info::Server> object, from which server 
 information can be retrieved.
+
+Nonexistant until the trawler has been ->run().
 
 =head3 dump
 
