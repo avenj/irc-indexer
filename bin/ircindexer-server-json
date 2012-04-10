@@ -4,6 +4,13 @@ use strict;
 use warnings;
 
 ## FIXME optional on-disk cache / persistency
+## need:
+##  methods to store and retrieve
+##  methods can determine whether to use DB or not
+##    store networks keyed on network name
+##    store servers keyed on NETNAME%servername
+use DB_File;
+my %JSCache;
 
 ## Core:
 use POSIX ();
@@ -82,7 +89,7 @@ GetOptions( $opts,
   /,
 );
 
-my $json = { };
+my $jsmemcache = { };
 
 ## These are set up here for ease of reference:
 
@@ -120,6 +127,7 @@ my $cfg = {
   Networks => {},
   BindAddr   => '0.0.0.0',
   ServerPort => 8700,
+  CacheDB  => undef,
   
   LogFile  => undef,
   LogLevel => undef,
@@ -190,6 +198,12 @@ sub get_cfg {
   }
   
   $cfg->{ServerPort} //= 8700;
+  
+  if ($cfg->{CacheDB}) {
+    tie %JSCache, "DB_File", $cfg->{CacheDB},
+      O_CREAT|O_RDWR, 0644, $DB_HASH
+      or die "Could not tie DB: $cfg->{CacheDB}: $!" ;    
+  }
 
   ## Read server specifications:  
   my $nethash = $conf->parse_nets($cfhash->{NetworkDir});
@@ -278,7 +292,10 @@ sub poco_init_session {
         _timer_chk
         _trawler_run
         _trawler_process
+        
         _cache_json
+        
+        _sig_int
       / ],
     ],
   );
@@ -360,13 +377,56 @@ sub _trawler_process {
   }
 }
 
+sub cache_json {
+  my ($data, $network, $server) = @_;
+
+  if ($server) {
+    ## store a server's json
+
+    if (tied %JSCache) {
+      ## using CacheDB
+      my $thiskey = $network.'%'.$server;
+      $JSCache{$thiskey} = $data;
+    } else {
+      $jsmemcache->{Servers}->{$network}->{$server} = $data;
+    }
+
+  } else {
+    ## store a network's json
+
+    if (tied %JSCache) {
+      $JSCache{$network} = $data;
+    } else {
+      $jsmemcache->{Networks}->{$network} = $data;
+    }
+
+  }
+}
+
+sub restore_json {
+  my ($network, $server) = @_;
+
+  if ($server) {
+
+    if (tied %JSCache) {
+      my $thiskey = $network.'%'.$server;
+      return $JSCache{$thiskey}
+    } else {
+      return unless exists $jsmemcache->{Servers}->{$network};
+      return $jsmemcache->{Servers}->{$network}->{$server}
+    }
+
+  } else {
+    return $JSCache{$network} if tied %JSCache;
+    return $jsmemcache->{Networks}->{$network}
+  }  
+}
+
 sub _cache_json {
   my $kernel = $_[KERNEL];
-  my ($network, $server, $s_obj, $n_obj) = @_[ARG0 .. $#_];
-  
-  $json->{Servers}->{$network}->{$server} = $s_obj->dump;
-
-  $json->{Networks}->{$network} = $n_obj->dump;
+  my ($network, $server, $s_obj, $n_obj) = @_[ARG0 .. $#_];  
+  cache_json( $s_obj->dump, $network, $server );
+  cache_json( $n_obj->dump, $network );
   log_to('irc', 'info',
     "Cached JSON: $network ($server)"
   );
@@ -480,6 +540,8 @@ sub create_trawler {
 sub _start {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   $kernel->alias_set('indexerhttp');
+  
+  $kernel->sig('INT', '_sig_int');
 
   log_to('session', 'info', 'Session started');
 
@@ -525,7 +587,15 @@ sub _start {
   $state->{stats}->{TotalServers}  = $total_servers;
 }
 
-sub _stop {}
+sub _sig_int {
+  $_[KERNEL]->yield('_stop');
+}
+
+sub _stop {
+  log_to('session', 'warn', "_stop received");
+  untie %JSCache if tied %JSCache;
+  $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
+}
 
 ## HTTP states
 
@@ -611,12 +681,8 @@ sub h_server {
   my ($network, $server) = @_[ARG2, ARG3];
   ## handed off by h_network
 
-  ## don't autoviv on failed requests:
-  unless (
-    exists $json->{Servers}->{$network} 
-    && defined $json->{Servers}->{$network}->{$server}
-  ) {
-    
+  my $json;
+  unless ( $json = restore_json($network, $server) ) {
     ## no JSON for this server, 404
     my $reason;
     
@@ -632,8 +698,6 @@ sub h_server {
     $kernel->yield( h_error_404 => $req, $resp, $reason );
     return
   }
-
-  my $json = $json->{Servers}->{$network}->{$server};
   
   $resp->content_type('application/json');
   $resp->content($json);
@@ -652,7 +716,17 @@ sub h_servlist {
   my ($req, $resp, $network) = @_[ARG0, ARG1, ARG2];
   ## handed off by h_network
 
-  my $servlist = [ keys %{ $json->{Servers}->{$network}//{} } ];
+  my $servlist;
+  
+  if (tied %JSCache) {
+    my @cachekeys = grep { 
+        index($_, "${network}%") == 0 
+      } keys %JSCache;
+    $servlist = [ map { s/^$network%// } @cachekeys ];
+  } else {
+    $servlist = [ keys %{ $jsmemcache->{Servers}->{$network}//{} } ];
+  }
+  
   my $jsify = IRC::Indexer::Output::JSON->new(
     Input => $servlist,
   );
@@ -676,7 +750,14 @@ sub h_netlist {
 
   ## Return JSONified array of pullable networks:
 
-  my $netlist = [ keys %{ $json->{Networks}//{} } ];
+  my $netlist;
+  
+  if (tied %JSCache) {
+    $netlist = [ grep { index($_, '%') == -1 } keys %JSCache ];
+  } else {
+    $netlist = [ keys %{ $jsmemcache->{Networks}//{} } ];
+  }
+
   my $jsify = IRC::Indexer::Output::JSON->new(
     Input => $netlist,
   );
@@ -733,19 +814,6 @@ sub h_network {
     return
   }
 
-  ## We don't know this network:
-  unless (defined $json->{Networks}->{$network}) {
-    my $reason;
-    if (defined $cfg->{Networks}->{$network}) {
-      ## configured but not trawled
-      $reason = "$network pending trawler run";
-    } else {
-      $reason = "No such network";
-    }
-    $kernel->yield( h_error_404 => $req, $resp, $reason );
-    return
-  }
-    
   ## if this is a /network/<net>/server, hand it off:
   if ($chunks[1] && $chunks[1] eq "server") {
     my $server = $chunks[2];
@@ -758,9 +826,22 @@ sub h_network {
     return
   }
 
-  ## otherwise, try to serve a net hash
-  
-  my $json = $json->{Networks}->{$network};
+  my $json;
+  ## We don't know this network:
+  unless ( $json = restore_json($network) ) {
+    my $reason;
+    if (defined $cfg->{Networks}->{$network}) {
+      ## configured but not trawled
+      $reason = "$network pending trawler run";
+    } else {
+      $reason = "No such network";
+    }
+    $kernel->yield( h_error_404 => $req, $resp, $reason );
+    return
+  }
+    
+
+  ## otherwise, try to serve a net hash:
   
   $resp->content_type('application/json');
   $resp->content($json);

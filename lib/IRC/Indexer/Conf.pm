@@ -51,6 +51,10 @@ sub parse_nets {
     unless ($this_spec->{Network}) {
       croak "specfile missing Network definition: $specpath"
     }
+
+    unless ( index($this_spec->{Network}, '%') == -1 ) {
+      croak "'%' is not valid in network names"
+    }
     
     my $servname = $this_spec->{Server};
     my $netname  = $this_spec->{Network};
@@ -134,6 +138,16 @@ sub example_cf_httpd {
 #   Interval: 15
 ##
 NetworkDir: /home/ircindex/networks
+
+## CacheDB:
+##
+## If CacheDB is specified, rather than caching JSON in memory,
+## an on-disk database is used.
+##
+## Large pools of trawlers will store quite a bit of data after 
+## a few runs have completed.
+## This trades some performance for significant memory savings.
+CacheDB: /home/ircindex/.indexerjson.db
 
 ## ServerPort:
 ##
