@@ -1,12 +1,12 @@
-use Test::More tests => 35;
+use Test::More tests => 48;
 
 BEGIN {
   use_ok( 'IRC::Indexer::Info::Server' );
   use_ok( 'IRC::Indexer::Info::Network' );
 }
 
+## Info::Server
 my $server  = new_ok( 'IRC::Indexer::Info::Server'  );
-my $network = new_ok( 'IRC::Indexer::Info::Network' );
 
 ok( $server->connectedto('irc.cobaltirc.org'), 'connectedto() set' );
 is( $server->connectedto, 'irc.cobaltirc.org', 'connectedto() get' );
@@ -60,9 +60,7 @@ ok( $server->add_channel('#threeuser', 3, 'topic string 3'),
 );
 
 my $hashchans;
-ok( $hashchans = $server->hashchans, 'hashchans() get' );
-is_deeply( $hashchans,
-  {
+my $expected_hashchans = {
     '#oneuser' => {
       Users => 1,
       Topic => 'topic string',
@@ -77,21 +75,57 @@ is_deeply( $hashchans,
       Users => 3,
       Topic => 'topic string 3',
     },
-  },
-  'hashchans compare'
-);
+};
+  
+ok( $hashchans = $server->hashchans, 'hashchans() get' );
+is_deeply( $hashchans, $expected_hashchans, 'hashchans compare' );
 
 my $listchans;
-ok( $listchans = $server->listchans, 'listchans() get' );
-is_deeply( $listchans, 
-  [
+my $expected_listchans = [
     [ '#threeuser', 3, 'topic string 3' ],
     [ '#twouser', 2, 'topic string 2'   ],
     [ '#oneuser', 1, 'topic string'     ],
-  ],
-  'listchans sort order'
-);
+];
+
+ok( $listchans = $server->listchans, 'listchans() get' );
+is_deeply( $listchans, $expected_listchans, 'listchans sort order' );
 
 my $dump;
 ok( $dump = $server->info, 'info()' );
 ok( ref $dump eq 'HASH', 'info() is a hash' );
+
+## Info::Network
+
+my $network = new_ok( 'IRC::Indexer::Info::Network' );
+ok( $network->add_server($server), 'add_server()' );
+
+is( $network->users, 5, 'network users() compare' );
+is( $network->opers, 2, 'network opers() compare' );
+is( $network->connectedat, $ts, 'network connectedat() compare' );
+is( $network->finishedat,  $ts, 'network finishedatat() compare' );
+is( $network->lastserver, 'eris.oppresses.us', 'network lastserver() compare' );
+
+ok( $network->motd_for('eris.oppresses.us'), 'motd_for()' );
+
+my $servers;
+ok( $servers = $network->servers, 'servers() get' );
+
+is_deeply( $servers,
+  {
+    'eris.oppresses.us' => {
+      MOTD => [
+        'MOTD line',
+        'MOTD line 2'
+      ],
+    },
+  },
+  'servers() compare'
+);
+
+$listchans = undef;
+ok( $listchans = $network->channels, 'network channels() get' );
+is_deeply( $listchans, $expected_listchans, 'network channels() compare' );
+
+$hashchans = undef;
+ok( $hashchans = $network->chanhash, 'network chanhash() get' );
+is_deeply( $hashchans, $expected_hashchans, 'network chanhash() compare' );
