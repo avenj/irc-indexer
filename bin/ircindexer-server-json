@@ -551,8 +551,6 @@ sub _trawler_process {
   $obj->{NetInfo}->{$network} = IRC::Indexer::Info::Network->new()
     unless blessed $obj->{NetInfo}->{$network};
   
-#  warn "DEBUG SIZEOF NetInfo ".total_size($obj->{NetInfo});
-  
   ## feed it this server's Info object:
   $obj->{NetInfo}->{$network}->add_server($info);
 
@@ -562,10 +560,8 @@ sub _trawler_process {
   );
 
   my $server_name  = $info->servername;
-  my $server_dump  = $s_js->dump;
-  my $network_dump = $n_js->dump;
   $kernel->yield( '_cache_json',
-    $network, $server_name, $server_dump, $network_dump
+    $network, $server_name, $s_js, $n_js
   );
   
   ## Replace this finished trawler
@@ -601,8 +597,11 @@ sub _trawler_process {
 }
 
 sub _cache_json {
+  ## eventy frontend to cache_json()
   my $kernel = $_[KERNEL];
-  my ($network, $server, $s_hash, $n_hash) = @_[ARG0 .. $#_];  
+  my ($network, $server, $s_js, $n_js) = @_[ARG0 .. $#_];  
+  my $s_hash = $s_js->dump;
+  my $n_hash = $n_js->dump;
   cache_json( $s_hash, $network, $server );
   cache_json( $n_hash, $network );
   log_to('irc', 'info',

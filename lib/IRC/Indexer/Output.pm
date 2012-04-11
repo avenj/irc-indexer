@@ -43,8 +43,6 @@ sub write {
   close $fh;
 }
 
-
-
 1;
 __END__
 

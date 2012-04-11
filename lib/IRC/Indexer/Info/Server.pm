@@ -166,7 +166,7 @@ sub add_channel {
     Topic => $topic,
     Users => $users,
   };
-  ++$self->netinfo->{ChannelCount};
+  ++$self->netinfo->{ChanCount};
   return $channel
 }
 

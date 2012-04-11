@@ -5,8 +5,6 @@ use strict;
 use warnings;
 use Carp;
 
-use Storable qw/dclone/;
-
 use Scalar::Util qw/blessed/;
 
 sub new {
