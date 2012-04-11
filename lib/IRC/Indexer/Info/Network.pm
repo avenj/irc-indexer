@@ -7,6 +7,8 @@ use Carp;
 
 use Scalar::Util qw/blessed/;
 
+use Storable qw/dclone/;
+
 sub new {
   my $self = {},
   my $class = shift;
@@ -104,16 +106,17 @@ sub add_server {
 
   my $name = $info->server;
   $servers->{$name}->{TrawledAt} = $info->finishedat;
-  $servers->{$name}->{MOTD} = $info->motd if $self->{ServerMOTDs};
+  $servers->{$name}->{MOTD} = dclone( $info->motd )
+    if $self->{ServerMOTDs};
   
   ## these can all be overriden network-wide:
   $network->{GlobalUsers} = $info->users;
   $network->{OperCount}   = $info->opers;
   $network->{ChanCount}   = $info->totalchans;
-  $network->{HashChans}   = $info->chanhash;
+  $network->{HashChans}   = dclone( $info->chanhash );
   $network->{ConnectedAt} = $info->connectedat;
   $network->{FinishedAt}  = $info->finishedat;
-  $network->{ListLinks}   = $info->links;
+  $network->{ListLinks}   = dclone( $info->links );
   $network->{LastServer}  = $name;
 }
 
