@@ -13,7 +13,7 @@ use Config;
 use Digest::SHA  qw/sha1_hex/;
 use File::Path   qw/make_path remove_tree/;
 use Scalar::Util qw/blessed/;
-use Storable     qw/dclone/;
+use Storable     qw/dclone thaw nfreeze freeze/;
 use POSIX ();
 use Time::HiRes;
 
@@ -406,6 +406,7 @@ sub session_sig_int {
 }
 
 sub _stop {
+  ## FIXME kill encoders if any are running
   log_to('session', 'warn', "_stop received");
   $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
   cachedir_clean() if $cfg->{CacheDir};
@@ -560,7 +561,9 @@ sub e_trawler_process {
     my $netinfo_obj;
     if ($obj->{NetInfo}->{$network}) {
       my $zipped = $obj->{NetInfo}->{$network};
-      my $this_netinfo_hash = decode_json( memGunzip($zipped) );
+      my $stored = memGunzip($zipped);
+      undef $zipped;
+      my $this_netinfo_hash = thaw($stored);
       $netinfo_obj = IRC::Indexer::Report::Network->new(
         FromHash => $this_netinfo_hash,
       );
@@ -570,22 +573,27 @@ sub e_trawler_process {
     
     ## feed it this server's Info object:
     $netinfo_obj->add_server($info);
+    undef $info;
   
     ## process and grab new hash:
     my $n_info = $netinfo_obj->netinfo;
     undef $netinfo_obj;
-    ## preserve it for later Network reconstruction:
-    $obj->{NetInfo}->{$network} = memGzip( encode_json($n_info) );
-  
-    my $server_name  = $info->servername;
-    
-    push(@{ $state->{pending_encode} },
-      [ $n_info, $network ],
-      [ $s_info, $network, $server ],
-    );
+    ## preserve it for later Network reconstruction
+    ## also passed as-is to the encoder, below
+    my $frozen = nfreeze($n_info);
+    $obj->{NetInfo}->{$network} = memGzip($frozen);
     
     ## Try to push to encoders now.
     ## js_push_pending will yield back if there's too many active.
+
+    push(@{ $state->{pending_encode} },
+      [ $frozen, $network ],
+    );
+    $kernel->call( $_[SESSION], 'js_push_pending');
+
+    push(@{ $state->{pending_encode} },
+      [ nfreeze($s_info), $network, $server ],
+    );
     $kernel->call( $_[SESSION], 'js_push_pending');
   }
      
