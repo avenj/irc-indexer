@@ -1,14 +1,14 @@
 use Test::More tests => 53;
 
 BEGIN {
-  use_ok( 'IRC::Indexer::Info::Server' );
-  use_ok( 'IRC::Indexer::Info::Network' );
+  use_ok( 'IRC::Indexer::Report::Server' );
+  use_ok( 'IRC::Indexer::Report::Network' );
   
   use_ok( 'IRC::Indexer::Output::JSON' );
 }
 
-## Info::Server
-my $server  = new_ok( 'IRC::Indexer::Info::Server'  );
+## Report::Server
+my $server  = new_ok( 'IRC::Indexer::Report::Server'  );
 
 ok( $server->connectedto('irc.cobaltirc.org'), 'connectedto() set' );
 is( $server->connectedto, 'irc.cobaltirc.org', 'connectedto() get' );
@@ -97,14 +97,14 @@ ok( $dump = $server->info, 'info()' );
 ok( ref $dump eq 'HASH', 'info() is a hash' );
 
 ## Should be able to create an identical obj
-my $identical = new_ok( 'IRC::Indexer::Info::Server' => [
+my $identical = new_ok( 'IRC::Indexer::Report::Server' => [
   FromHash => $dump,
 ] );
 is( $identical->server, 'eris.oppresses.us', 'imported server()' );
 
-## Info::Network
+## Report::Network
 
-my $network = new_ok( 'IRC::Indexer::Info::Network' => [ 
+my $network = new_ok( 'IRC::Indexer::Report::Network' => [ 
   ServerMOTDs => 1,
 ] );
 ok( $network->add_server($server), 'add_server()' );

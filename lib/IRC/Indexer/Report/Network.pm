@@ -1,4 +1,4 @@
-package IRC::Indexer::Info::Network;
+package IRC::Indexer::Report::Network;
 
 use 5.12.1;
 use strict;
@@ -47,9 +47,7 @@ sub new {
 
 ## Simple read-only accessors:
 
-## Remain compatible with Info::Server interface:
 sub info { netinfo(@_) }
-sub dump { netinfo(@_) }
 sub netinfo {
   my ($self) = @_;
   return $self->{Network}
@@ -100,8 +98,8 @@ sub lastserver {
 
 sub add_server {
   my ($self, $info) = @_;
-  ## given a Info::Server object (or subclass), merge to this Network
-  croak "add_server needs an IRC::Indexer::Info::Server obj"
+  ## given a Report::Server object (or subclass), merge to this Network
+  croak "add_server needs an IRC::Indexer::Report::Server obj"
     unless blessed $info;
   
   ## keyed on reported server name
@@ -132,24 +130,30 @@ __END__
 
 =head1 NAME
 
-IRC::Indexer::Info::Network - Network information class for IRC::Indexer
+IRC::Indexer::Report::Network - Network information class for IRC::Indexer
 
 =head1 SYNOPSIS
 
-  my $network = IRC::Indexer::Info::Network->new;
+  my $network = IRC::Indexer::Report::Network->new;
 
   ## Or: save server MOTDs to global network hash.  
   ## Tracking a lot of MOTDs will eat memory fast.
-  my $network = IRC::Indexer::Info::Network->new(
+  my $network = IRC::Indexer::Report::Network->new(
     ServerMOTDs => 1,
   );
   
-  ## Get ::Info::Server object from finished trawl bot:
+  ## Get ::Report::Server object from finished trawl bot:
   my $info_obj  = $trawler->info;
   ## Feed it to add_server:
   $network->add_server( $info_obj );
+  
   ## Get a network info hash:
   my $net_hash = $network->dump;
+  
+  ## Re-create a Network object from a dumped hash:
+  $network = IRC::Indexer::Report::Network->new(
+    FromHash => $net_hash,
+  );
 
 =head1 DESCRIPTION
 
@@ -162,7 +166,7 @@ way to merge multiple trawled servers into a single network summary.
 
 Merges server information from a Trawl::Bot run.
 
-Argument must be a L<IRC::Indexer::Info::Server> object.
+Argument must be a L<IRC::Indexer::Report::Server> object.
 
 =head3 netinfo
 
@@ -199,11 +203,6 @@ Returns the global user count if available via B<LUSERS>
 =head3 opers
 
 Returns the global operator count if available via B<LUSERS>
-
-=head3 channels
-
-Returns the sorted array of parsed B<LIST> results, as described in 
-L<IRC::Indexer::Trawl::Bot>
 
 =head3 chanhash
 

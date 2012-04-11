@@ -186,12 +186,12 @@ IRC::Indexer::Trawl::Multi - Trawl multiple IRC servers
       ## Get IRC::Indexer::Trawl::Bot object:
       my $this_trawler = $multi->trawler($server);
       
-      ## Get IRC::Indexer::Info::Server object:
+      ## Get IRC::Indexer::Report::Server object:
       my $this_info    = $this_trawler->info;
       
       ## For parsing details, see:
       ##  perldoc IRC::Indexer::Trawl::Bot
-      ##  perldoc IRC::Indexer::Info::Server
+      ##  perldoc IRC::Indexer::Report::Server
     }
   } else {
     ## Active trawlers remain.

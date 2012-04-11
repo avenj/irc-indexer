@@ -7,12 +7,12 @@ IRC::Indexer::POD::ServerSpec - Export format for a single server
 =head1 DESCRIPTION
 
 This document describes the format of IRC::Indexer exports from a single 
-trawler; this is the hash returned by L<IRC::Indexer::Info::Server>
+trawler; this is the hash returned by L<IRC::Indexer::Report::Server>
 after a trawler run has completed.
 
 See L<IRC::Indexer::POD::NetworkSpec> for details on the format of 
 network-wide information exports as provided by 
-L<IRC::Indexer::Info::Network>.
+L<IRC::Indexer::Report::Network>.
 
 Current as of IRC::Indexer 0.01
 

@@ -1,4 +1,4 @@
-package IRC::Indexer::Info::Server;
+package IRC::Indexer::Report::Server;
 
 use 5.12.1;
 use strict;
@@ -194,20 +194,20 @@ __END__
 
 =head1 NAME
 
-IRC::Indexer::Info::Server - Server information class for IRC::Indexer
+IRC::Indexer::Report::Server - Server information class for IRC::Indexer
 
 =head1 SYNOPSIS
 
   ## Create new blank server info obj:
-  my $info = IRC::Indexer::Info::Server->new;
+  my $info = IRC::Indexer::Report::Server->new;
 
-  . . . add trawler data .  . .
+  . . . add trawler data via methods .  . .
   
   ## Get server's info as hash:
   my $ref = $info->netinfo;
   
   ## Construct from previously-exported hash:
-  my $info = IRC::Indexer::Info::Server->new(
+  my $info = IRC::Indexer::Report::Server->new(
     FromHash => $previous->netinfo(),
   );
   
@@ -217,11 +217,21 @@ IRC::Indexer::Info::Server - Server information class for IRC::Indexer
 
 Represents the results of a single trawled server.
 
+This is the object returned by L<IRC::Indexer::Trawl::Bot/info> -- it 
+can be used to pull out specific pieces of information about a trawl 
+run (or a complete dump), or fed to an L<IRC::Indexer::Report::Network> to 
+be merged into a network summary.
+
 =head2 Methods
 
 =head3 netinfo
 
 Returns the entire NetInfo hash, as documented below (L</netinfo hash>).
+
+=head3 clone
+
+Returns a B<cloned copy> of the current state of the NetInfo hash, as 
+opposed to the reference returned by L</netinfo>.
 
 =head3 status
 
@@ -331,7 +341,7 @@ Keys are B<Users> and B<Topic>:
 
 =head3 add_channel
 
-Used internally by trawlers.
+Used by trawlers to append a channel from LIST output.
 
 Adds a channel to the channel hash (see L</chanhash>):
 

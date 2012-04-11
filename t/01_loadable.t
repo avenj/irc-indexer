@@ -6,8 +6,8 @@ BEGIN {
   use_ok( 'IRC::Indexer::Trawl::Bot' );
   use_ok( 'IRC::Indexer::Trawl::Multi') ;
 
-  use_ok( 'IRC::Indexer::Info::Server') ;
-  use_ok( 'IRC::Indexer::Info::Network') ;
+  use_ok( 'IRC::Indexer::Report::Server') ;
+  use_ok( 'IRC::Indexer::Report::Network') ;
   
   use_ok( 'IRC::Indexer::Conf') ;
   use_ok( 'IRC::Indexer::Logger') ;

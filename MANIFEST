@@ -14,8 +14,8 @@ lib/IRC/Indexer/Output/JSON.pm
 lib/IRC/Indexer/Output/YAML.pm
 lib/IRC/Indexer/Trawl/Bot.pm
 lib/IRC/Indexer/Trawl/Multi.pm
-lib/IRC/Indexer/Info/Network.pm
-lib/IRC/Indexer/Info/Server.pm
+lib/IRC/Indexer/Report/Network.pm
+lib/IRC/Indexer/Report/Server.pm
 MANIFEST			This list of files
 Makefile.PL
 INSTALL

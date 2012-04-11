@@ -30,7 +30,7 @@ use IRC::Indexer::Conf;
 use IRC::Indexer::Logger;
 
 use IRC::Indexer::Trawl::Bot;
-use IRC::Indexer::Info::Network;
+use IRC::Indexer::Report::Network;
 
 use IRC::Indexer::Output::JSON;
 
@@ -536,11 +536,11 @@ sub _trawler_process {
   if ($obj->{NetInfo}->{$network}) {
     my $zipped = $obj->{NetInfo}->{$network};
     my $this_netinfo_hash = decode_json( memGunzip($zipped) );
-    $netinfo_obj = IRC::Indexer::Info::Network->new(
+    $netinfo_obj = IRC::Indexer::Report::Network->new(
       FromHash => $this_netinfo_hash,
     );
   } else {
-    $netinfo_obj = IRC::Indexer::Info::Network->new();
+    $netinfo_obj = IRC::Indexer::Report::Network->new();
   }
   
   ## feed it this server's Info object:

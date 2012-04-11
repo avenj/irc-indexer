@@ -9,8 +9,8 @@ IRC::Indexer::POD::NetworkSpec - Export format for a network
 This document describes the format of IRC::Indexer exports from a 
 collection of trawlers composing an IRC network.
 
-This is the data returned by L<IRC::Indexer::Info::Network> after it has 
-been fed at least one L<IRC::Indexer::Info::Server>.
+This is the data returned by L<IRC::Indexer::Report::Network> after it has 
+been fed at least one L<IRC::Indexer::Report::Server>.
 
 You'll probably want to read L<IRC::Indexer::POD::ServerSpec> -- the 
 same conventions apply.

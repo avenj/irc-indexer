@@ -16,7 +16,7 @@ use Carp;
 
 use IRC::Indexer;
 
-use IRC::Indexer::Info::Server;
+use IRC::Indexer::Report::Server;
 
 use POE;
 use POE::Component::IRC;
@@ -60,7 +60,7 @@ sub trawler_for { return $_[0]->{ircserver} }
 sub run {
   my ($self) = @_;
 
-  $self->{Serv} = IRC::Indexer::Info::Server->new;
+  $self->{Serv} = IRC::Indexer::Report::Server->new;
   $self->{Serv}->connectedto( $self->{ircserver} );
   
   POE::Session->create(
@@ -117,6 +117,7 @@ sub irc {
   return $self->{ircobj}
 }
 
+sub report { info(@_) }
 sub info {
   my ($self) = @_;
   return $self->{Serv}
@@ -487,12 +488,13 @@ When the trawler is finished, $trawl->done() will be boolean true; if
 there was some error, $trawl->failed() will be true and will contain a 
 scalar string describing the error.
 
-The B<info()> method returns the L<IRC::Indexer::Info::Server> object.
+The B<report()> method returns the L<IRC::Indexer::Report::Server> 
+object.
 
 The B<dump()> method returns a hash reference containing network 
-information (or undef if not done); see L<IRC::Indexer::Info::Server> 
+information (or undef if not done); see L<IRC::Indexer::Report::Server> 
 for details. This is the hash returned by 
-L<IRC::Indexer::Info::Server/netinfo>
+L<IRC::Indexer::Report::Server/netinfo>
 
 The trawler attempts to be polite, spacing out requests for LINKS, 
 LUSERS, and LIST; you can fine-tune the interval between commands by 
@@ -518,17 +520,17 @@ contain a string describing the problem.
 
 Returns boolean true if the trawler instance has finished.
 
-=head3 info
+=head3 report
 
-Returns the L<IRC::Indexer::Info::Server> object, from which server 
+Returns the L<IRC::Indexer::Report::Server> object, from which server 
 information can be retrieved.
 
 Nonexistant until the trawler has been ->run().
 
 =head3 dump
 
-Returns the L</netinfo> hash if the trawler instance has finished, or 
-undef if not.
+Returns the L</report> hash if the trawler instance has finished, or 
+undef if not. See L<IRC::Indexer::Report::Server>
 
 =head1 AUTHOR
 

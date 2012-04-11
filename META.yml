@@ -20,12 +20,6 @@ provides:
   IRC::Indexer::Conf:
     file: lib/IRC/Indexer/Conf.pm
     version: 0
-  IRC::Indexer::Info::Network:
-    file: lib/IRC/Indexer/Info/Network.pm
-    version: 0
-  IRC::Indexer::Info::Server:
-    file: lib/IRC/Indexer/Info/Server.pm
-    version: 0
   IRC::Indexer::Logger:
     file: lib/IRC/Indexer/Logger.pm
     version: 0
@@ -41,6 +35,12 @@ provides:
   IRC::Indexer::Output::YAML:
     file: lib/IRC/Indexer/Output/YAML.pm
     version: 0
+  IRC::Indexer::Report::Network:
+    file: lib/IRC/Indexer/Report/Network.pm
+    version: 0
+  IRC::Indexer::Report::Server:
+    file: lib/IRC/Indexer/Report/Server.pm
+    version: 0
   IRC::Indexer::Trawl::Bot:
     file: lib/IRC/Indexer/Trawl/Bot.pm
     version: 0
@@ -48,7 +48,6 @@ provides:
     file: lib/IRC/Indexer/Trawl/Multi.pm
     version: 0
 requires:
-  DB_File: 0
   Data::Dumper: 0
   Getopt::Long: 0
   IRC::Utils: 0
