@@ -137,7 +137,7 @@ sub links {
 sub chancount { totalchans(@_) }
 sub totalchans {
   my ($self) = @_;
-  return $self->netinfo->{ChanCount};
+  return $self->netinfo->{ChanCount}
 }
 
 sub listchans { channels(@_) }

@@ -134,15 +134,19 @@ sub example_cf_httpd {
 ##
 NetworkDir: /home/ircindex/networks
 
-## CacheDB:
+## CacheDir:
 ##
-## If CacheDB is specified, rather than caching JSON in memory,
-## an on-disk database is used.
+## If CacheDir is specified, rather than caching JSON in memory,
+## it is serialized to disk.
 ##
 ## Large pools of trawlers will store quite a bit of data after 
 ## a few runs have completed.
 ## This trades some performance for significant memory savings.
-CacheDB: /home/ircindex/.indexerjson.db
+##
+## IMPORTANT:
+##  Any preexisting contents of the CacheDir will be deleted.
+##  Choose wisely :-)
+#CacheDir: /home/ircindex/jsoncache
 
 ## ListChans:
 ##

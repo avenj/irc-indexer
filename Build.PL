@@ -25,7 +25,7 @@ my $build = Module::Build->new(
     'POSIX'        => 0,
     'Scalar::Util' => 0,
     'Storable'     => 0,
-    'DB_File'      => 0,
+#    'DB_File'      => 0,
 
    ## POE
     'POE' => '1.311',
