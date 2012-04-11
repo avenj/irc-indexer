@@ -517,64 +517,64 @@ sub e_trawler_process {
     );
     ++$state->{stats}->{Fail}->{$network}->{$orig_server};
     $state->{stats}->{LastFailure}->{$network} = "$orig_server: $err";
-    return
-  }
-
-  my $server = $trawler->info->servername;
-
-  log_to('irc', 'info', 
-    "Completed trawler: $network ($server)"
-  );
-  
-  ++$state->{stats}->{Success}->{$network}->{$orig_server};
-  
-  my $info = $trawler->info;
-  
-  ## sort ListChans:
-  $info->channels if $cfg->{ListChans};
-
-  ## feed to JSONify
-  my $s_info = $info->clone;
-  my $s_js = IRC::Indexer::Output::JSON->new(
-    Input => $s_info,
-  );
-
-  ## NetInfo objects can get very large ...
-  ## we serialize/compress them in-mem and revive them here:
-  my $netinfo_obj;
-  if ($obj->{NetInfo}->{$network}) {
-    my $zipped = $obj->{NetInfo}->{$network};
-    my $this_netinfo_hash = decode_json( memGunzip($zipped) );
-    $netinfo_obj = IRC::Indexer::Report::Network->new(
-      FromHash => $this_netinfo_hash,
-    );
   } else {
-    $netinfo_obj = IRC::Indexer::Report::Network->new();
+
+    my $server = $trawler->info->servername;
+
+    log_to('irc', 'info', 
+      "Completed trawler: $network ($server)"
+    );
+  
+    ++$state->{stats}->{Success}->{$network}->{$orig_server};
+  
+    my $info = $trawler->info;
+  
+    ## sort ListChans:
+    $info->channels if $cfg->{ListChans};
+
+    ## feed to JSONify
+    my $s_info = $info->clone;
+    my $s_js = IRC::Indexer::Output::JSON->new(
+      Input => $s_info,
+    );
+  
+    ## NetInfo objects can get very large ...
+    ## we serialize/compress them in-mem and revive them here:
+    my $netinfo_obj;
+    if ($obj->{NetInfo}->{$network}) {
+      my $zipped = $obj->{NetInfo}->{$network};
+      my $this_netinfo_hash = decode_json( memGunzip($zipped) );
+      $netinfo_obj = IRC::Indexer::Report::Network->new(
+        FromHash => $this_netinfo_hash,
+      );
+    } else {
+      $netinfo_obj = IRC::Indexer::Report::Network->new();
+    }
+    
+    ## feed it this server's Info object:
+    $netinfo_obj->add_server($info);
+  
+    ## process and grab new hash:
+    my $n_info = $netinfo_obj->netinfo;
+    undef $netinfo_obj;
+    $obj->{NetInfo}->{$network} = memGzip( encode_json($n_info) );
+  
+    my $n_js = IRC::Indexer::Output::JSON->new(
+      Input => $n_info,
+    );
+  
+    my $server_name  = $info->servername;
+    $kernel->yield( 'e_cache_json',
+      $network, $server_name, $s_js, $n_js
+    );
   }
-  
-  ## feed it this server's Info object:
-  $netinfo_obj->add_server($info);
-
-  ## process and grab new hash:
-  my $n_info = $netinfo_obj->netinfo;
-  undef $netinfo_obj;
-  $obj->{NetInfo}->{$network} = memGzip( encode_json($n_info) );
-
-  my $n_js = IRC::Indexer::Output::JSON->new(
-    Input => $n_info,
-  );
-
-  my $server_name  = $info->servername;
-  $kernel->yield( 'e_cache_json',
-    $network, $server_name, $s_js, $n_js
-  );
-  
+     
   ## Replace this finished trawler
   my $this_trawler_cf = $cfg->{Networks}->{$network}->{$orig_server};
   unless (defined $this_trawler_cf) {
     ## May have disappeared in a rehash.
     log_to('irc', 'warn', 
-      "Not readding trawler: no conf: $network: $server"
+      "Not readding trawler: no conf: $network: $orig_server"
     );
     return
   }
@@ -871,7 +871,7 @@ sub h_server {
   }
 
   my $uri = URI->new($req->uri);
-  if ($uri->query && $uri->query eq 'gzip') {
+  if ($uri->query && $uri->query =~ /^gzip/) {
     $resp->content_type('application/x-gzip');
     $resp->content( $zipped );
   } else {  
@@ -1019,7 +1019,7 @@ sub h_network {
 
   ## otherwise, try to serve a net hash:
 
-  if ($uri->query && $uri->query eq 'gzip') {
+  if ($uri->query && $uri->query =~ /^gzip/) {
     $resp->content_type('application/x-gzip');
     $resp->content( $zipped );
   } else {  
