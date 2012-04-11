@@ -49,7 +49,15 @@ sub new {
 
 sub info { netinfo(@_) }
 sub netinfo {
-  my ($self) = @_;
+  my $self = shift;
+  my %args = @_;
+  
+  if ($args{nochannels}) {
+    my $cloned = dclone($self->{Network});
+    delete $cloned->{HashChans};
+    return $cloned
+  }
+  
   return $self->{Network}
 }
 
@@ -170,7 +178,13 @@ Argument must be a L<IRC::Indexer::Report::Server> object.
 
 =head3 netinfo
 
-Returns the network information hash.
+Returns a reference to the network information hash.
+
+You can exclude the channel list if you'd like to pull it out 
+separately, for example when serializing a result from a large network; 
+this will produced a cloned copy minus channels:
+
+  my $ninfo = $network->netinfo(NoChannels => 1);
 
 =head3 connectedat
 

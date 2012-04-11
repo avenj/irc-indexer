@@ -28,13 +28,26 @@ sub new {
 }
 
 sub clone {
-  my ($self) = @_;
-  return dclone($self->{NetInfo})
+  my $self = shift;
+  my %args = @_;
+  $args{lc $_} = $args{$_} for keys %args;
+  
+  my $cloned = dclone($self->{NetInfo});
+  
+  delete $cloned->{HashChans} if $args{nochannels};
+  delete $cloned->{ListChans} if $args{nochannels};
+  
+  return $cloned
 }
 
 sub info { netinfo(@_) }
 sub netinfo {
-  my ($self) = @_;
+  my $self = shift;
+  my %args = @_;
+  $args{lc $_} = $args{$_} for keys %args;
+  
+  return $self->clone(%args) if $args{nochannels};
+
   return $self->{NetInfo}
 }
 
@@ -232,6 +245,11 @@ Returns the entire NetInfo hash, as documented below (L</netinfo hash>).
 
 Returns a B<cloned copy> of the current state of the NetInfo hash, as 
 opposed to the reference returned by L</netinfo>.
+
+If NoChannels is specified, HashChans and ListChans will be excluded 
+from the cloned dump:
+
+  my $without_chans = $info->clone(NoChannels => 1);
 
 =head3 status
 
