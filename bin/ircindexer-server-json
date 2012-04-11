@@ -298,15 +298,16 @@ sub poco_init_session {
         _start
         _stop
 
-        _init_nets
+        session_sig_int
 
-        _timer_chk
-        _trawler_run
-        _trawler_process
+        e_init_nets
+
+        e_timer_chk
+        e_trawler_run
+        e_trawler_process
         
-        _cache_json
+        e_cache_json
         
-        _sig_int
       / ],
     ],
   );
@@ -318,21 +319,21 @@ sub _start {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   $kernel->alias_set('indexerhttp');
   
-  $kernel->sig('INT', '_sig_int');
-  $kernel->sig('TERM', '_sig_int');
+  $kernel->sig('INT', 'session_sig_int');
+  $kernel->sig('TERM', 'session_sig_int');
 
   log_to('session', 'info', 'Session started');
 
   ## init httpd
   my @htstates = poco_cfg_httpd();
   
-  $kernel->call( $_[SESSION], '_init_nets' );
+  $kernel->call( $_[SESSION], 'e_init_nets' );
   
   ## add states from $state->{htevents}
   $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};  
 }
 
-sub _init_nets {
+sub e_init_nets {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
 
   ## called by either _start or _rehash
@@ -351,7 +352,7 @@ sub _init_nets {
       log_to('irc', 'info', "Init trawler: $network -> $server");
 
       ## push configuration to array
-      ## create_trawler in _trawler_run     
+      ## create_trawler in e_trawler_run     
       my %trawlopts = %$this_cf;
       push(@{$ArrayConf->{$network}}, 
         [ $network, $server, { Server => $server, %trawlopts } ]
@@ -368,7 +369,7 @@ sub _init_nets {
 
   } ## NETWORK
   
-  $kernel->alarm('_timer_chk' => time + 3);
+  $kernel->alarm('e_timer_chk' => time + 3);
 
   log_to('irc', 'info',
     "Trawling $total_servers servers across $total_nets networks"
@@ -378,7 +379,7 @@ sub _init_nets {
   $state->{stats}->{TotalServers}  = $total_servers;  
 }
 
-sub _sig_int {
+sub session_sig_int {
   $_[KERNEL]->yield('_stop');
 }
 
@@ -388,7 +389,7 @@ sub _stop {
   cachedir_clean() if $cfg->{CacheDir};
 }
 
-sub _timer_chk {
+sub e_timer_chk {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my $pool = $state->{timers};
 
@@ -414,7 +415,7 @@ sub _timer_chk {
       }
 
       log_to('irc', 'info', "Scheduling initial trawler for $network");
-      $kernel->alarm_add( '_trawler_run', time + ($sp+=0.5),
+      $kernel->alarm_add( 'e_trawler_run', time + ($sp+=0.5),
         $ArrayConf->{$network}->[0] 
       );
     }
@@ -435,18 +436,18 @@ sub _timer_chk {
         ## Splice this trawler's cf out of this network's ArrayConf:
         splice @{ $ArrayConf->{$network} }, $idx, 1;
         
-        ## It'll be pushed back later by _trawler_process:
-        $kernel->yield( '_trawler_process', $network, $trawler );
+        ## It'll be pushed back later by e_trawler_process:
+        $kernel->yield( 'e_trawler_process', $network, $trawler );
 
         ## Schedule the next one for this net to run in ten minutes,
         ## if we have one.
-        ## If we don't have one, _trawler_process should create and 
+        ## If we don't have one, e_trawler_process should create and 
         ## schedule this one again.
         my $next_trawler = $ArrayConf->{$network}->[0];
         if (defined $next_trawler) {
           my $next_run_at  = time + ($opts->{interval} || 600);
           $kernel->alarm_add(
-            '_trawler_run', $next_run_at, $next_trawler
+            'e_trawler_run', $next_run_at, $next_trawler
           );
           log_to('irc', 'debug', 
             "Scheduling next trawler for $network"
@@ -466,10 +467,10 @@ sub _timer_chk {
 
   } ## NETWORK
 
-  $kernel->alarm('_timer_chk' => time + 3);  
+  $kernel->alarm('e_timer_chk' => time + 3);  
 }
 
-sub _trawler_run {
+sub e_trawler_run {
   ## takes an arrayref:
   ##  [ network, server, conf-as-hashref ]
   my ($kernel, $heap, $confitem) = @_[KERNEL, HEAP, ARG0];
@@ -493,7 +494,7 @@ sub _trawler_run {
   $state->{stats}->{LastTrawledServer} = $server;
 }
 
-sub _trawler_process {
+sub e_trawler_process {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($network, $trawler) = @_[ARG0, ARG1];
 
@@ -501,7 +502,7 @@ sub _trawler_process {
 
   unless (blessed $trawler) {
     log_to('irc', 'warn', 
-      "Cannot _trawler_process unblessed trawler for $network"
+      "Cannot e_trawler_process unblessed trawler for $network"
     );
   }
   
@@ -556,7 +557,7 @@ sub _trawler_process {
   );
 
   my $server_name  = $info->servername;
-  $kernel->yield( '_cache_json',
+  $kernel->yield( 'e_cache_json',
     $network, $server_name, $s_js, $n_js
   );
   
@@ -586,13 +587,13 @@ sub _trawler_process {
   unless (@{ $ArrayConf->{$network} } > 1) {
     my $next_run_at  = time + ($opts->{interval} || 600);
     $kernel->alarm_add(
-      '_trawler_run', $next_run_at, $replaced_cf
+      'e_trawler_run', $next_run_at, $replaced_cf
     );
     log_to('irc', 'debug', "Scheduling single trawler for $network");
   }
 }
 
-sub _cache_json {
+sub e_cache_json {
   ## eventy frontend to cache_json()
   my $kernel = $_[KERNEL];
   my ($network, $server, $s_js, $n_js) = @_[ARG0 .. $#_];  

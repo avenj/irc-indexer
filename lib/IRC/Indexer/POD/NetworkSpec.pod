@@ -25,7 +25,8 @@ same conventions apply.
 
   Servers     => HASH   (see below)
   LastServer  => STRING (last server trawled for this network)
-  
+
+  ChanCount   => INT  (public channels only)  
   HashChans   => HASH
   ListChans   => ARRAY
 

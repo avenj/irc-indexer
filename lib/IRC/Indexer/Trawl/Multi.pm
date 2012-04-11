@@ -42,7 +42,7 @@ sub run {
         '_start',
         '_stop',
         
-        '_check_trawlers',
+        'm_check_trawlers',
       ],
     ],
   );
@@ -95,10 +95,10 @@ sub _start {
   }
   
   ## spawn a timer to check on them
-  $kernel->alarm('_check_trawlers', time + 5);
+  $kernel->alarm('m_check_trawlers', time + 5);
 }
 
-sub _check_trawlers {
+sub m_check_trawlers {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   
   BOT: for my $server (keys %{ $self->{Trawlers} }) {
@@ -113,7 +113,7 @@ sub _check_trawlers {
     $self->done(1);
   } else {
     ## not done, reschedule
-    $kernel->alarm('_check_trawlers', time + 5);
+    $kernel->alarm('m_check_trawlers', time + 5);
   }
 
 }

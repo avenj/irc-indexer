@@ -73,9 +73,9 @@ sub run {
          _stop
          shutdown
          
-         _check_timeout
-         _retrieve_info
-         _issue_cmd
+         b_check_timeout
+         b_retrieve_info
+         b_issue_cmd
          
          irc_connected
          irc_001
@@ -174,7 +174,7 @@ sub _stop {
 sub shutdown {
   my ($self, $kernel) = @_[OBJECT, KERNEL];
   
-  $kernel->alarm('_check_timeout') if ref $kernel;
+  $kernel->alarm('b_check_timeout') if ref $kernel;
   
 #  carp "DEBUG trawler shutdown called";
   
@@ -210,10 +210,10 @@ sub _start {
   $irc->yield(register => 'all');
   $irc->yield(connect => {});
   
-  $kernel->alarm( '_check_timeout', time + 10 );
+  $kernel->alarm( 'b_check_timeout', time + 10 );
 }
 
-sub _retrieve_info {
+sub b_retrieve_info {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   
   ## called via alarm() (in irc_001)
@@ -235,12 +235,12 @@ sub _retrieve_info {
   ## stagger them out at reasonable intervals to avoid flood prot:
   my $alrm = 2;
   for my $cmd (qw/list links lusers/) {
-    $kernel->alarm_add('_issue_cmd', time + $alrm, $cmd);
+    $kernel->alarm_add('b_issue_cmd', time + $alrm, $cmd);
     $alrm += $self->{interval};
   }
 }
 
-sub _issue_cmd {
+sub b_issue_cmd {
   my ($self, $cmd) = @_[OBJECT, ARG0];
   
   ## most servers will announce lusers at connect-time:
@@ -250,7 +250,7 @@ sub _issue_cmd {
   $self->irc->yield($cmd);
 }
 
-sub _check_timeout {
+sub b_check_timeout {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $irc = $self->irc;
   my $info = $self->info;
@@ -274,7 +274,7 @@ sub _check_timeout {
     $kernel->post( $_[SESSION], 'shutdown' );
   }
   
-  $kernel->alarm( '_check_timeout', time + 10 );
+  $kernel->alarm( 'b_check_timeout', time + 10 );
 }
 
 ## PoCo::IRC handlers
@@ -311,8 +311,8 @@ sub irc_error {
 sub irc_001 {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   $self->info->status('CONNECTED');
-  ## let things settle out, then _retrieve_info:
-  $kernel->alarm('_retrieve_info', time + 6);
+  ## let things settle out, then b_retrieve_info:
+  $kernel->alarm('b_retrieve_info', time + 6);
 }
 
 sub irc_375 {

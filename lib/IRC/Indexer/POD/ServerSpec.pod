@@ -89,7 +89,7 @@ newlines.
 
 =head2 Channels
 
-  ChanCount => INT
+  ChanCount => INT (public channels only)
   ListChans => ARRAY (of arrays)
   HashChans => HASH
 
