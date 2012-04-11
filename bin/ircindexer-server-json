@@ -138,7 +138,7 @@ my $cfg = {
   CacheDir   => undef,
   ListChans  => undef,
   
-  MaxEncoders => 3,
+  MaxEncoders => 10,
   
   LogFile  => undef,
   LogLevel => undef,
@@ -318,9 +318,7 @@ sub poco_init_session {
         e_trawler_run
         e_trawler_process
         
-        e_cache_json
-
-        js_check_pending        
+        js_push_pending        
         js_worker_stdout
         js_worker_stderr
         js_worker_error
@@ -394,8 +392,6 @@ sub e_init_nets {
   
   $kernel->alarm('e_timer_chk' => time + 3);
   
-  $kernel->alarm('js_check_pending' => Time::HiRes::time + 0.5);
-
   log_to('irc', 'info',
     "Trawling $total_servers servers across $total_nets networks"
   );
@@ -405,6 +401,7 @@ sub e_init_nets {
 }
 
 sub session_sig_int {
+  warn "Exiting due to signal";
   $_[KERNEL]->yield('_stop');
 }
 
@@ -581,9 +578,15 @@ sub e_trawler_process {
     $obj->{NetInfo}->{$network} = memGzip( encode_json($n_info) );
   
     my $server_name  = $info->servername;
-    $kernel->yield( 'e_cache_json',
-      $network, $server_name, $s_info, $n_info
+    
+    push(@{ $state->{pending_encode} },
+      [ $n_info, $network ],
+      [ $s_info, $network, $server ],
     );
+    
+    ## Try to push to encoders now.
+    ## js_push_pending will yield back if there's too many active.
+    $kernel->call( $_[SESSION], 'js_push_pending');
   }
      
   ## Replace this finished trawler
@@ -617,19 +620,6 @@ sub e_trawler_process {
     log_to('irc', 'debug', "Scheduling single trawler for $network");
   }
 }
-
-sub e_cache_json {
-  ## eventy frontend to cache_json()
-  my $kernel = $_[KERNEL];
-  my ($network, $server, $s_hash, $n_hash) = @_[ARG0 .. $#_];  
-
-  ## Push network first.
-  push(@{ $state->{pending_encode} },
-    [ $n_hash, $network ],
-    [ $s_hash, $network, $server ],
-  );
-}
-
 
 ## Helpers
 
@@ -1055,17 +1045,19 @@ sub post_request {
 }
 
 ## Forkable worker states
-sub js_check_pending {
+sub js_push_pending {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   
-  $kernel->alarm('js_check_pending' => Time::HiRes::time + 0.5);
-
   ## return if no pending encodes
   return unless @{ $state->{pending_encode}//[] };
 
-  ## return if too many workers running
-  return if ($cfg->{MaxEncoders}||3) <=
-    scalar keys %{ $obj->{workers_by_pid}//{} };
+  ## yield back if too many workers running
+  if ( ($cfg->{MaxEncoders}||10) 
+        <= scalar keys %{ $obj->{workers_by_pid}//{} } 
+  ){
+    $kernel->yield('js_push_pending');
+    return
+  }
   
   ## otherwise fork worker and put()
   my $item = shift @{ $state->{pending_encode} };
