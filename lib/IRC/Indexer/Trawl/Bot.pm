@@ -1,14 +1,5 @@
 package IRC::Indexer::Trawl::Bot;
 
-## FIXME fix verbose/warn output
-
-## feed me a server / port to connect to
-## connect to the server / port
-## grab relevant info, shove it into $self
-## 
-## if we have everything we need or timeout is up, disconnect
-## provide a method that returns undef if we're in-progress, or net info hash
-
 use 5.12.1;
 use strict;
 use warnings;

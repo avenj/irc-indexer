@@ -682,8 +682,9 @@ sub cachedir_write {
 }
 
 sub cachedir_read {
-  my ($network, $server) = @_;
+  my ($gzipped, $network, $server) = @_;
   return unless $network;
+  $gzipped = 0 if $gzipped eq 'json';
   
   my $cachedir;
   die "cachedir_read called but no CacheDir configured"
@@ -698,7 +699,7 @@ sub cachedir_read {
     ## not fatal ... you just get nothing:
     open my $fh, '<', $path or return;
     binmode $fh;
-    { local $/; $data = memGunzip(<$fh>) }
+    { local $/; $data = <$fh> }
     close $fh;
   } else {
     ## try to find/read $cachedir/$network.z
@@ -706,11 +707,13 @@ sub cachedir_read {
     return unless -r $path;
     open my $fh, '<', $path or return;
     binmode $fh;
-    { local $/; $data = memGunzip(<$fh>) }
+    { local $/; $data = <$fh> }
     close $fh;
   }
   
-  return $data
+  return $data if $gzipped;
+  my $unzipped = memGunzip($data) if $data;
+  return $unzipped // $data
 }
 
 ## FIXME
@@ -735,22 +738,27 @@ sub cache_json {
   }
 }
 
-sub restore_json {
-  my ($network, $server) = @_;
-
+sub restore_cache {
+  my ($gzipped, $network, $server) = @_;
+  $gzipped = 0 if $gzipped eq 'json';
+  
   if ($server) {
 
     if ($cfg->{CacheDir}) {
-      return cachedir_read($network, $server)
+      return cachedir_read($gzipped, $network, $server)
     } else {
       return unless exists $jsmemcache->{Servers}->{$network};
-      return $jsmemcache->{Servers}->{$network}->{$server}
+      my $cachedjs = $jsmemcache->{Servers}->{$network}->{$server};
+      return memGzip($cachedjs) if $cachedjs and $gzipped;
+      return $cachedjs
     }
   } else {
     if ($cfg->{CacheDir}) {
-      return cachedir_read($network)
+      return cachedir_read($gzipped, $network)
     } else {
-      return $jsmemcache->{Networks}->{$network}
+      my $cachedjs = $jsmemcache->{Networks}->{$network};
+      return memGzip($cachedjs) if $cachedjs and $gzipped;
+      return $cachedjs
     }
   }  
 }
@@ -844,8 +852,8 @@ sub h_server {
   my ($network, $server) = @_[ARG2, ARG3];
   ## handed off by h_network
 
-  my $json;
-  unless ( $json = restore_json($network, $server) ) {
+  my $zipped;
+  unless ( $zipped = restore_cache('zip', $network, $server) ) {
     ## no JSON for this server, 404
     my $reason;
     
@@ -861,9 +869,16 @@ sub h_server {
     $kernel->yield( h_error_404 => $req, $resp, $reason );
     return
   }
-  
-  $resp->content_type('application/json');
-  $resp->content($json);
+
+  my $uri = URI->new($req->uri);
+  if ($uri->query && $uri->query eq 'gzip') {
+    $resp->content_type('application/x-gzip');
+    $resp->content( $zipped );
+  } else {  
+    my $json = memGunzip($zipped);
+    $resp->content_type('application/json');
+    $resp->content($json);
+  }
 
   $resp->respond;
 
@@ -882,7 +897,7 @@ sub h_servlist {
   my $servlist = [];
   
   if ($cfg->{CacheDir}) {
-    my $netjson = cachedir_read($network);
+    my $netjson = cachedir_read('json', $network);
   
     if ($netjson) {
       my $net_hash = decode_json($netjson);
@@ -976,9 +991,9 @@ sub h_network {
     return
   }
 
-  my $json;
+  my $zipped;
   ## We don't know this network:
-  unless ( $json = restore_json($network) ) {
+  unless ( $zipped = restore_cache('zip', $network) ) {
     my $reason;
     if (defined $cfg->{Networks}->{$network}) {
       ## configured but not trawled
@@ -1003,9 +1018,15 @@ sub h_network {
   }    
 
   ## otherwise, try to serve a net hash:
-  
-  $resp->content_type('application/json');
-  $resp->content($json);
+
+  if ($uri->query && $uri->query eq 'gzip') {
+    $resp->content_type('application/x-gzip');
+    $resp->content( $zipped );
+  } else {  
+    my $json = memGunzip($zipped);
+    $resp->content_type('application/json');
+    $resp->content($json);
+  }
 
   $resp->respond;
 
@@ -1103,11 +1124,14 @@ list of servers available for retrieval, see L</Servers>, below.
 
 Network information hashes are exported via B</network/> routes:
 
-  ## JSON Network Info hash for 'CobaltIRC':
-  http://my.server:8700/network/CobaltIRC
-
   ## JSON array of available trawled networks:
   http://my.server:8700/network
+
+  ## JSON Network Info hash for 'CobaltIRC':
+  http://my.server:8700/network/CobaltIRC
+  
+  ## Compressed:
+  http://my.server:8700/network/CobaltIRC?gzip
 
 These are indexed by their configured network name.
 
@@ -1121,6 +1145,9 @@ exported via /network/<NETNAME>/server/<SERVERNAME>:
 
   ## Trawl results from a single server:
   http://my.server:8700/network/CobaltIRC/server/eris.oppresses.us
+  
+  ## Compressed:
+  http://my.server:8700/network/CobaltIRC/server/eris.oppresses.us?gzip
 
 Note that servers are not available for retrieval until they are 
 trawled; depending on trawl intervals, it may take some time to cycle 

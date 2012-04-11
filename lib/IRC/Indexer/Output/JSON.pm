@@ -10,7 +10,7 @@ our @ISA = qw/IRC::Indexer::Output/;
 sub dump {
   my ($self) = @_;
   my $input = $self->{Input};
-  my $json = JSON::XS->new->utf8(1)->pretty->encode($input);
+  my $json = JSON::XS->new->utf8(1)->indent->encode($input);
   $self->{Output} = $json;
   $self->SUPER::dump();
 }
