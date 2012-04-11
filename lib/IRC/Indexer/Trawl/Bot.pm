@@ -183,8 +183,7 @@ sub shutdown {
   warn "-> shutdown\n" if $self->verbose;
   
   $self->done(1);
-  $self->irc->yield('disconnect') if ref $self->irc;
-  $self->irc->yield('shutdown')   if ref $self->irc;
+  $self->irc->call('shutdown')   if ref $self->irc;
   $self->irc(1);
 }
 

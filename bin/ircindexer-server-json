@@ -104,7 +104,7 @@ my $obj = {
 };
 
 my $state = { 
-  active_trawlers => {};
+  active_trawlers => {},
   timers => { trawlers => {} },
   stats  => {
     Version => $IRC::Indexer::VERSION,
@@ -361,10 +361,8 @@ sub _init_nets {
 
   ## called by either _start or _rehash
   
-  ## FIXME: clear configured trawlers in $ArrayConf instead
-  ## $ArrayConf = {};
-  ## clear objs if we have any
-  $obj->{Trawlers} = { };
+  ## clear configured trawlers in $ArrayConf
+  $ArrayConf = { };
 
   my($total_nets, $total_servers);
   NETWORK: for my $network (keys %{ $cfg->{Networks} }) {
@@ -376,24 +374,20 @@ sub _init_nets {
       
       log_to('irc', 'info', "Init trawler: $network -> $server");
 
-      ## FIXME push configuration to array
-      ## only create_trawler in _run
-      # push(@{$ArrayConf->{$network}}, 
-      #  [ $network, $server, { Server => $server, %trawlopts } ]
-      # );
-      
+      ## push configuration to array
+      ## create_trawler in _trawler_run     
       my %trawlopts = %$this_cf;
-      my $trawler = create_trawler(Server => $server, %trawlopts);
+      push(@{$ArrayConf->{$network}}, 
+        [ $network, $server, { Server => $server, %trawlopts } ]
+      );
       
-      ## push to network's trawler array
-      push( @{ $obj->{Trawlers}->{$network} }, $trawler);
-      
-      log_to('irc', 'debug', "Trawler constructed for $server");      
+      log_to('irc', 'debug', "Trawler configured for $server");
     } ## SERVER
           
     ## add to chk pool
+    ## FIXME: move HasRun
     $state->{timers}->{trawlers}->{$network} = {
-      LastRun => 0,
+      HasRun => 0,
     };
 
   } ## NETWORK
@@ -425,56 +419,50 @@ sub _timer_chk {
   
   my @trawlers;
 
-  ## FIXME for my $network (keys %$ArrayConf) ...
-  ##  move/rename $pool bits, LastRun should live somewhere else
-  NETWORK: for my $network (keys %{$pool->{trawlers}}) {
+  ## FIXME
+  ##  move/rename $pool bits, HasRun should live somewhere else
+  NETWORK: for my $network (keys %$ArrayConf) {
     my $this_net = $pool->{trawlers}->{$network};
     
-    my $last_trawled = $this_net->{LastRun};
+    my $last_trawled = $this_net->{HasRun};
     unless ($last_trawled) {
       ## No trawlers have been run for this network, yet.
-      ## Spin one up, set LastRun time.
-      $this_net->{LastRun} = time();
-      ## FIXME grab conf for this network instead
-      ## pass it to trawler_run
-      ## -> _trawler_run, $ArrayConf->{$network}->[0]
-      if (@{ $obj->{Trawlers}->{$network} }) {
-        log_to('irc', 'info', "Running initial trawler for $network");
-        $kernel->yield( '_trawler_run', 
-          $obj->{Trawlers}->{$network}->[0]
-        );
-        next NETWORK
-      } else {
+      ## Spin one up, set HasRun time.
+      $this_net->{HasRun} = time();
+      
+      unless (@{ $ArrayConf->{$network} }) {
         log_to('irc', 'debug', "No trawlers to check for $network");
-        next NETWORK
+        next NETWORK     
       }
+
+      log_to('irc', 'info', "Running initial trawler for $network");
+      $kernel->yield( '_trawler_run', $ArrayConf->{$network}->[0] );
     }
 
-    ## FIXME check for active trawler objects for this network 
-    ##  in @{ $state->{active_trawlers}->{$network}//[] }
-    unless (@{ $obj->{Trawlers}->{$network} }) {
-      log_to('irc', 'info', "No trawlers to check for $network");
+    unless (@{ $state->{active_trawlers}->{$network}//[] }) {
+      log_to('irc', 'debug', "No active trawlers for $network");
     }
     
     my @pending;
     my $idx = 0;
-    ## FIXME active trawler objects in @{ $state->{active_trawlers}->{$network} }
-    ## TRAWLER: for my $trawler (@{ $state->{active_trawlers}->{$network} })
-    TRAWLER: for my $trawler (@{ $obj->{Trawlers}->{$network} }) {
+    TRAWL: for my $trawler (@{ $state->{active_trawlers}->{$network} }) {
       if ($trawler->done) {
         ## Have a finished trawler.
-
-        ## Splice this trawler out of this network's array:
-        splice @{ $obj->{Trawlers}->{$network} }, $idx, 1;
         
-        ## It'll be handled by _trawler_process:
+        ## Drop this trawler from active_trawlers:
+        splice @{ $state->{active_trawlers}->{$network} }, $idx, 1;
+
+        ## Splice this trawler's cf out of this network's ArrayConf:
+        splice @{ $ArrayConf->{$network} }, $idx, 1;
+        
+        ## It'll be pushed back later by _trawler_process:
         $kernel->yield( '_trawler_process', $network, $trawler );
 
         ## Schedule the next one for this net to run in ten minutes,
         ## if we have one.
         ## If we don't have one, _trawler_process should create and 
         ## schedule this one again.
-        my $next_trawler = $obj->{Trawlers}->{$network}->[0];
+        my $next_trawler = $ArrayConf->{$network}->[0];
         if (defined $next_trawler) {
           my $next_run_at  = time + ($opts->{interval} || 600);
           $kernel->alarm_add(
@@ -488,7 +476,7 @@ sub _timer_chk {
         push(@pending, $servername);
       }
       ++$idx;
-    } ## TRAWLER
+    } ## TRAWL
 
     log_to('irc', 'debug',
       "Trawlers pending for $network: ". join ', ', @pending
@@ -500,19 +488,23 @@ sub _timer_chk {
 }
 
 sub _trawler_run {
-  ## FIXME take an arrayref
+  ## takes an arrayref:
   ##  [ network, server, conf-as-hashref ]
-  my ($kernel, $heap, $trawler) = @_[KERNEL, HEAP, ARG0];
+  my ($kernel, $heap, $confitem) = @_[KERNEL, HEAP, ARG0];
   
-  ## FIXME construct and run() the trawler
-  ## FIXME add to active trawlers array for this network
-  unless (blessed $trawler) {
-    log_to('irc', 'warn', "_trawler_run received unblessed trawler");
-    return
-  }
-  my $server = $trawler->trawler_for;
+  my ($network, $server, $trawlcf) = @$confitem;
+
+  log_to('irc', 'debug', 
+    "Constructring new trawler: $network: $server"
+  );
+  
+  my $trawler = create_trawler(%$trawlcf);
+  $trawler->run();
+  
+  ## Add to active trawlers for this network
+  push(@{ $state->{active_trawlers}->{$network} }, $trawler );
+
   log_to('irc', 'debug', "Trawler run issued for $server");
-  $trawler->run;
 
   ++$state->{stats}->{TrawlersExecuted};
   $state->{stats}->{LastTrawl} = time;
@@ -586,25 +578,25 @@ sub _trawler_process {
     return
   }
   
-  ## FIXME create_trawler in _run
-  ## pass _trawler_run configuration values instead
-  ##  _trawler_run 
   my %trawlopts = %$this_trawler_cf;
-  $trawler = create_trawler(Server => $server, %trawlopts);
+  my $replaced_cf = [ $network, $server,
+    {
+      Server => $server,
+      %trawlopts
+    },
+  ];
 
-  ## Push the replacement back to $obj->{Trawlers}->{$network}
-  ## FIXME push configuration back to ArrayConf instead
-  # push(@{$ArrayConf->{$network}}, $trawler_cf);
-  push(@{ $obj->{Trawlers}->{$network} }, $trawler);
-  log_to('irc', 'info', "Spawned fresh trawler: $network: $server");
+  push(@{$ArrayConf->{$network}}, $replaced_cf);
+
+  log_to('irc', 'info', "Rescheduled trawler: $network: $server");
   
-  ## If this is the only trawler, we can reschedule it now:
-  unless (@{ $obj->{Trawlers}->{$network} } > 1) {
+  ## If this is the only cfg'd trawler, we can reschedule it now:
+  unless (@{ $ArrayConf->{$network} } > 1) {
     my $next_run_at  = time + ($opts->{interval} || 600);
     $kernel->alarm_add(
-      '_trawler_run', $next_run_at, $trawler
+      '_trawler_run', $next_run_at, $replaced_cf
     );
-    log_to('irc', 'info', "Scheduling single trawler for $network");
+    log_to('irc', 'debug', "Scheduling single trawler for $network");
   }
 }
 
