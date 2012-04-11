@@ -291,7 +291,7 @@ sub irc_socketerr {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $err = $_[ARG0];
   $self->failed("irc_socketerr: $err");
-  $kernel->post( $_[SESSION], 'shutdown' );
+  $kernel->call( $_[SESSION], 'shutdown' );
 }
 
 sub irc_error {
@@ -299,7 +299,7 @@ sub irc_error {
   my $err = $_[ARG0];
   ## errored out. clean up and report failure status
   $self->failed("irc_error: $err") unless $self->done;
-  $kernel->post( $_[SESSION], 'shutdown' );
+  $kernel->call( $_[SESSION], 'shutdown' );
 }
 
 sub irc_001 {
