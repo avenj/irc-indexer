@@ -1084,6 +1084,7 @@ sub js_check_pending {
   my $forkable;
   if ($^O eq 'MSWin32') {
     ## sucks to be you!
+    require IRC::Indexer::Process::JSONify;
     $forkable = \&IRC::Indexer::Process::JSONify::worker;
   } else {
     $forkable = [
@@ -1107,8 +1108,8 @@ sub js_check_pending {
   
   $kernel->sig_child($pidof, 'js_worker_sigchld');
   
-  $obj->{workers_by_pid} = $wheel;
-  $obj->{workers_by_wid} = $wheel;
+  $obj->{workers_by_pid}->{$pidof}   = $wheel;
+  $obj->{workers_by_wid}->{$wheelid} = $wheel;
 
   ## Feed this worker.
   $wheel->put($item);
@@ -1220,6 +1221,8 @@ Indexes sets of servers in parallel via L<IRC::Indexer>, exporting
 information as JSON via HTTP for ease of retrieval.
 
 Uses L<POEx::HTTP::Server> to provide HTTP daemon functionality.
+
+JSON is encoded by forked L<IRC::Indexer::Process::JSONify> instances.
 
 Intended to serve as the back-end to a presentation system for the 
 data collected. See <IRC::Indexer::POD::ExampleClients> for some examples 

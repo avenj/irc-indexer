@@ -124,10 +124,10 @@ sub add_server {
   $network->{GlobalUsers} = $info->users;
   $network->{OperCount}   = $info->opers;
   $network->{ChanCount}   = $info->totalchans;
-  $network->{HashChans}   = dclone( $info->chanhash//{} );
+  $network->{HashChans}   = $info->chanhash // {};
   $network->{ConnectedAt} = $info->connectedat;
   $network->{FinishedAt}  = $info->finishedat;
-  $network->{ListLinks}   = dclone( $info->links//[] );
+  $network->{ListLinks}   = $info->links // [] ;
   $network->{LastServer}  = $name;
 }
 
