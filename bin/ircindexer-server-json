@@ -8,7 +8,7 @@ use warnings;
 ##  clear and reload network cfg in $cfg
 ##  re-init trawlers
 
-use Compress::Zlib;
+use Compress::Zlib qw/memGzip memGunzip/;
 use JSON::XS;
 
 ## Core:
@@ -390,6 +390,7 @@ sub _sig_int {
 sub _stop {
   log_to('session', 'warn', "_stop received");
   $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
+  cachedir_clean() if $cfg->{CacheDir};
 }
 
 sub _timer_chk {
@@ -643,7 +644,7 @@ sub cachedir_write {
     my $path = join '/', $dir_path, $hexified;
     open my $fh, '>', $path
       or die "cachedir_write; open failed: $path: $!";
-    print $fh compress($data);
+    print $fh memGzip($data);
     close $fh;
   } else {
     ## write compressed network file:
@@ -652,7 +653,7 @@ sub cachedir_write {
     open my $fh, '>', $path
       or die "cachedir_write; open failed: $path: $!";
     binmode $fh;
-    print $fh compress($data);
+    print $fh memGzip($data);
     close $fh;
   }
   return 1 
@@ -675,7 +676,7 @@ sub cachedir_read {
     ## not fatal ... you just get nothing:
     open my $fh, '<', $path or return;
     binmode $fh;
-    { local $/; $data = uncompress(<$fh>) }
+    { local $/; $data = memGunzip(<$fh>) }
     close $fh;
   } else {
     ## try to find/read $cachedir/$network.z
@@ -683,7 +684,7 @@ sub cachedir_read {
     return unless -r $path;
     open my $fh, '<', $path or return;
     binmode $fh;
-    { local $/; $data = uncompress(<$fh>) }
+    { local $/; $data = memGunzip(<$fh>) }
     close $fh;
   }
   
