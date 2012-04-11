@@ -202,7 +202,7 @@ sub _start {
   $irc->yield(register => 'all');
   $irc->yield(connect => {});
   
-  $kernel->alarm( 'b_check_timeout', time + 10 );
+  $kernel->alarm( 'b_check_timeout', time + 5 );
 }
 
 sub b_retrieve_info {
@@ -260,7 +260,7 @@ sub b_check_timeout {
   
   $shutdown++ if $stc == scalar @states;
 
-  my $connectedat = $info->connectedat || return;
+  my $connectedat = $info->connectedat || 0;
   $shutdown++ if time - $connectedat > $self->{timeout};
 
   if ($shutdown) {

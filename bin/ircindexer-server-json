@@ -31,7 +31,7 @@ use IRC::Indexer;
 use IRC::Indexer::Conf;
 use IRC::Indexer::Logger;
 
-use IRC::Indexer::Trawl::Bot;
+use IRC::Indexer::Trawl::Forking;
 use IRC::Indexer::Report::Network;
 
 use IRC::Indexer::Output::JSON;
@@ -636,7 +636,7 @@ sub e_cache_json {
 sub create_trawler {
   my %trawlopts = @_;
   my $this_cf = \%trawlopts;
-  my $trawler = IRC::Indexer::Trawl::Bot->new(
+  my $trawler = IRC::Indexer::Trawl::Forking->new(
     Server => $this_cf->{Server},
     Port   => $this_cf->{Port},
     Nickname => $this_cf->{Nickname},

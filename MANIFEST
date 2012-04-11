@@ -15,9 +15,11 @@ lib/IRC/Indexer/POD/ClientExamples.pod
 lib/IRC/Indexer/POD/NetworkSpec.pod
 lib/IRC/Indexer/POD/ServerSpec.pod
 lib/IRC/Indexer/Process/JSONify.pm
+lib/IRC/Indexer/Process/Trawler.pm
 lib/IRC/Indexer/Report/Network.pm
 lib/IRC/Indexer/Report/Server.pm
 lib/IRC/Indexer/Trawl/Bot.pm
+lib/IRC/Indexer/Trawl/Forking.pm
 lib/IRC/Indexer/Trawl/Multi.pm
 Makefile.PL
 MANIFEST			This list of files
