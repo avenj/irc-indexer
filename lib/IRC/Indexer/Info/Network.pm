@@ -72,12 +72,6 @@ sub users {
   return $self->{Network}->{GlobalUsers}
 }
 
-sub listchans { channels(@_) }
-sub channels {
-  my ($self) = @_;
-  return $self->{Network}->{ListChans}
-}
-
 sub hashchans { chanhash(@_) }
 sub chanhash {
   my ($self) = @_;
@@ -119,7 +113,6 @@ sub add_server {
   $network->{GlobalUsers} = $info->users;
   $network->{OperCount}   = $info->opers;
   $network->{ChanCount}   = $info->totalchans;
-  $network->{ListChans}   = $info->channels;
   $network->{HashChans}   = $info->chanhash;
   $network->{ConnectedAt} = $info->connectedat;
   $network->{FinishedAt}  = $info->finishedat;

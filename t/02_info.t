@@ -1,4 +1,4 @@
-use Test::More tests => 55;
+use Test::More tests => 53;
 
 BEGIN {
   use_ok( 'IRC::Indexer::Info::Server' );
@@ -133,10 +133,6 @@ is_deeply( $servers,
   },
   'servers() compare'
 );
-
-$listchans = undef;
-ok( $listchans = $network->channels, 'network channels() get' );
-is_deeply( $listchans, $expected_listchans, 'network channels() compare' );
 
 $hashchans = undef;
 ok( $hashchans = $network->chanhash, 'network chanhash() get' );
