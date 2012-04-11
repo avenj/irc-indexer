@@ -91,8 +91,6 @@ GetOptions( $opts,
   /,
 );
 
-my $jsmemcache = { };
-
 ## These are set up here for ease of reference:
 
 my $obj = {
@@ -106,6 +104,7 @@ my $obj = {
 };
 
 my $state = { 
+  active_trawlers => {};
   timers => { trawlers => {} },
   stats  => {
     Version => $IRC::Indexer::VERSION,
@@ -138,6 +137,15 @@ my $cfg = {
   LogHTTP  => 1,
   LogIRC   => 1,
 };
+
+## for managing trawler creation
+## keyed on network name
+## value is array of arrays containing:
+##  [ 'network', 'server', $trawler_opts_hashref ]
+my $ArrayConf = { };
+
+## If we're missing CacheDB:
+my $jsmemcache = { };
 
 sub get_cfg {
   ## set up $cfg and logging
@@ -353,6 +361,8 @@ sub _init_nets {
 
   ## called by either _start or _rehash
   
+  ## FIXME: clear configured trawlers in $ArrayConf instead
+  ## $ArrayConf = {};
   ## clear objs if we have any
   $obj->{Trawlers} = { };
 
@@ -366,6 +376,12 @@ sub _init_nets {
       
       log_to('irc', 'info', "Init trawler: $network -> $server");
 
+      ## FIXME push configuration to array
+      ## only create_trawler in _run
+      # push(@{$ArrayConf->{$network}}, 
+      #  [ $network, $server, { Server => $server, %trawlopts } ]
+      # );
+      
       my %trawlopts = %$this_cf;
       my $trawler = create_trawler(Server => $server, %trawlopts);
       
@@ -398,7 +414,6 @@ sub _sig_int {
 
 sub _stop {
   log_to('session', 'warn', "_stop received");
-  db_close();
   $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
 }
 
@@ -410,6 +425,8 @@ sub _timer_chk {
   
   my @trawlers;
 
+  ## FIXME for my $network (keys %$ArrayConf) ...
+  ##  move/rename $pool bits, LastRun should live somewhere else
   NETWORK: for my $network (keys %{$pool->{trawlers}}) {
     my $this_net = $pool->{trawlers}->{$network};
     
@@ -418,6 +435,9 @@ sub _timer_chk {
       ## No trawlers have been run for this network, yet.
       ## Spin one up, set LastRun time.
       $this_net->{LastRun} = time();
+      ## FIXME grab conf for this network instead
+      ## pass it to trawler_run
+      ## -> _trawler_run, $ArrayConf->{$network}->[0]
       if (@{ $obj->{Trawlers}->{$network} }) {
         log_to('irc', 'info', "Running initial trawler for $network");
         $kernel->yield( '_trawler_run', 
@@ -429,13 +449,17 @@ sub _timer_chk {
         next NETWORK
       }
     }
-    
+
+    ## FIXME check for active trawler objects for this network 
+    ##  in @{ $state->{active_trawlers}->{$network}//[] }
     unless (@{ $obj->{Trawlers}->{$network} }) {
       log_to('irc', 'info', "No trawlers to check for $network");
     }
     
     my @pending;
     my $idx = 0;
+    ## FIXME active trawler objects in @{ $state->{active_trawlers}->{$network} }
+    ## TRAWLER: for my $trawler (@{ $state->{active_trawlers}->{$network} })
     TRAWLER: for my $trawler (@{ $obj->{Trawlers}->{$network} }) {
       if ($trawler->done) {
         ## Have a finished trawler.
@@ -476,7 +500,12 @@ sub _timer_chk {
 }
 
 sub _trawler_run {
+  ## FIXME take an arrayref
+  ##  [ network, server, conf-as-hashref ]
   my ($kernel, $heap, $trawler) = @_[KERNEL, HEAP, ARG0];
+  
+  ## FIXME construct and run() the trawler
+  ## FIXME add to active trawlers array for this network
   unless (blessed $trawler) {
     log_to('irc', 'warn', "_trawler_run received unblessed trawler");
     return
@@ -540,9 +569,11 @@ sub _trawler_process {
     Input => $ref,
   );
 
-  my $server_name = $info->servername;
+  my $server_name  = $info->servername;
+  my $server_dump  = $s_js->dump;
+  my $network_dump = $n_js->dump;
   $kernel->yield( '_cache_json',
-    $network, $server_name, $s_js->dump, $n_js->dump
+    $network, $server_name, $server_dump, $network_dump
   );
   
   ## Replace this finished trawler
@@ -554,10 +585,16 @@ sub _trawler_process {
     );
     return
   }
+  
+  ## FIXME create_trawler in _run
+  ## pass _trawler_run configuration values instead
+  ##  _trawler_run 
   my %trawlopts = %$this_trawler_cf;
   $trawler = create_trawler(Server => $server, %trawlopts);
 
   ## Push the replacement back to $obj->{Trawlers}->{$network}
+  ## FIXME push configuration back to ArrayConf instead
+  # push(@{$ArrayConf->{$network}}, $trawler_cf);
   push(@{ $obj->{Trawlers}->{$network} }, $trawler);
   log_to('irc', 'info', "Spawned fresh trawler: $network: $server");
   
