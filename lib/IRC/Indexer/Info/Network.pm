@@ -9,8 +9,9 @@ use Scalar::Util qw/blessed/;
 
 use Storable qw/dclone/;
 
+
 sub new {
-  my $self = {},
+  my $self = {};
   my $class = shift;
   bless $self, $class;
   

@@ -19,7 +19,7 @@ use IRC::Indexer;
 use IRC::Indexer::Info::Server;
 
 use POE;
-use POE::Component::IRC::State;
+use POE::Component::IRC;
 use POE::Component::IRC::Plugin::CTCP;
 
 use IRC::Utils qw/
@@ -128,6 +128,7 @@ sub failed {
   my ($self, $reason) = @_;
   return unless ref $self->info;
   if ($reason) {
+    $self->shutdown($poe_kernel);
     $self->info->status('FAIL');
     $self->info->failed($reason);
     $self->info->finishedat(time);
@@ -169,14 +170,10 @@ sub _stop {
 #  carp "DEBUG trawl session stop"
 }
 
-sub DESTROY {
-  $_[0]->shutdown($poe_kernel);
-}
-
 sub shutdown {
   my ($self, $kernel) = @_[OBJECT, KERNEL];
   
-  $kernel->alarm('_check_timeout');
+  $kernel->alarm('_check_timeout') if ref $kernel;
   
 #  carp "DEBUG trawler shutdown called";
   
@@ -298,6 +295,7 @@ sub irc_disconnected {
 sub irc_socketerr {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $err = $_[ARG0];
+  $kernel->post( $_[SESSION], 'shutdown' );
   $self->failed("irc_socketerr: $err");
 }
 
@@ -305,6 +303,7 @@ sub irc_error {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $err = $_[ARG0];
   ## errored out. clean up and report failure status
+  $kernel->post( $_[SESSION], 'shutdown' );
   $self->failed("irc_error: $err") unless $self->done;
 }
 

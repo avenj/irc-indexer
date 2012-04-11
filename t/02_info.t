@@ -147,3 +147,4 @@ my $net_json = new_ok( 'IRC::Indexer::Output::JSON' =>
   [ Input => $network->info ]
 );
 ok( $net_json->dump, 'JSONify network hash' );
+
