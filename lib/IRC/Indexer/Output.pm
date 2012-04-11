@@ -14,7 +14,8 @@ sub new {
   
   $args{lc $_} = delete $args{$_} for keys %args;
   
-  $self->{Input} = $args{input} || croak "No input specified in new" ;
+  $self->{Input} = delete $args{input} 
+    || croak "No input specified in new" ;
 
   return $self
 }

@@ -9,16 +9,19 @@ our @ISA = qw/IRC::Indexer::Output/;
 
 sub dump {
   my ($self) = @_;
-  my $input = $self->{Input};
-  my $json = JSON::XS->new->utf8(1)->indent->encode($input);
-  $self->{Output} = $json;
+  $self->{Output} = JSON::XS->new->utf8(1)->indent->encode(
+    $self->{Input}
+  );
   $self->SUPER::dump();
 }
 
 sub write {
   my ($self, $path) = @_;
-  my $input = $self->{Input};
-  $self->{Output} = encode_json($input) ."\n";
+  
+  $self->{Output} = JSON::XS->new->utf8(1)->indent->encode(
+    $self->{Input}
+  ) . "\n" ;
+
   $self->SUPER::write($path);
 }
 
