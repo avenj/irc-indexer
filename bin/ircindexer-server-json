@@ -100,7 +100,9 @@ my $obj = {
   
   ##  network -> server -> $obj
   Trawlers => {},
-  ## Info::Network objects per-network:
+  
+  ## Info::Network hashes per-network
+  ## Used to reconstruct Info::Networks
   NetInfo => {},
 };
 
@@ -497,7 +499,7 @@ sub _trawler_process {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($network, $trawler) = @_[ARG0, ARG1];
 
-  ## passed trawler objects marked as done
+  ## passed trawler objects marked as done (from _chk)
 
   unless (blessed $trawler) {
     log_to('irc', 'warn', 
@@ -506,18 +508,19 @@ sub _trawler_process {
   }
   
   my $server = $trawler->info->servername;
+  my $orig_server = $trawler->trawler_for;
+
+  if (my $err = $trawler->failed) {
+    log_to('irc', 'warn',
+      "Trawler reports failure: $network ($orig_server): $err"
+    );
+    return
+  }
 
   log_to('irc', 'info', 
     "Completed trawler: $network ($server)"
   );
   
-  if (my $err = $trawler->failed) {
-    log_to('irc', 'warn',
-      "Trawler reports failure: $network ($server): $err"
-    );
-    next
-  }
-
   my $info = $trawler->info;
   
   ## sort ListChans:
@@ -530,13 +533,25 @@ sub _trawler_process {
   );
 
   ## create an Info::Network if we don't have one
-  $obj->{NetInfo}->{$network} = IRC::Indexer::Info::Network->new()
-    unless blessed $obj->{NetInfo}->{$network};
+  my $netinfo_obj;
+  if ($obj->{NetInfo}->{$network}) {
+    my $zipped = $obj->{NetInfo}->{$network};
+    my $this_netinfo_hash = decode_json( memGunzip($zipped) );
+    $netinfo_obj = IRC::Indexer::Info::Network->new(
+      FromHash => $this_netinfo_hash,
+    );
+  } else {
+    $netinfo_obj = IRC::Indexer::Info::Network->new();
+  }
   
   ## feed it this server's Info object:
-  $obj->{NetInfo}->{$network}->add_server($info);
+  $netinfo_obj->add_server($info);
 
-  my $n_info = $obj->{NetInfo}->{$network}->netinfo;
+  ## process and grab new hash:
+  my $n_info = $netinfo_obj->netinfo;
+  undef $netinfo_obj;
+  $obj->{NetInfo}->{$network} = memGzip( encode_json($n_info) );
+
   my $n_js = IRC::Indexer::Output::JSON->new(
     Input => $n_info,
   );
@@ -547,7 +562,6 @@ sub _trawler_process {
   );
   
   ## Replace this finished trawler
-  my $orig_server = $trawler->trawler_for;
   my $this_trawler_cf = $cfg->{Networks}->{$network}->{$orig_server};
   unless (defined $this_trawler_cf) {
     ## May have disappeared in a rehash.
@@ -620,7 +634,7 @@ sub cachedir_clean {
   if (-e $cachedir) {
     die "CacheDir exists but not writable"
       unless -w $cachedir;
-    log_to('session', 'warn', 'Cleaning up CacheDir: $cachedir');
+    log_to('session', 'warn', "Cleaning up CacheDir");
     remove_tree($cachedir) if -e $cachedir;
   }
   make_path($cachedir);
