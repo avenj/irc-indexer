@@ -18,25 +18,29 @@ sub new {
   $args{lc $_} = delete $args{$_} for keys %args;
   
   $self->{ServerMOTDs} = 1 if $args{servermotds};
-  
-  $self->{Network} = {
-    Servers => {
-     ## ServerName => {
-     ##   MOTD => [],
-     ## }
-    },
+
+  if ($args{fromhash}) {
+    $self->{Network} = dclone($args{fromhash});  
+  } else { 
+    $self->{Network} = {
+      Servers => {
+       ## ServerName => {
+       ##   MOTD => [],
+       ## }
+      },
     
-    OperCount   => undef,
-    GlobalUsers => undef,
-    ListChans   => [],
-    HashChans   => {},
+      OperCount   => undef,
+      GlobalUsers => undef,
+      ListChans   => [],
+      HashChans   => {},
     
-    ListLinks  => [],
-    LastServer => undef,
+      ListLinks  => [],
+      LastServer => undef,
     
-    ConnectedAt => undef,
-    FinishedAt  => undef,
-  };
+      ConnectedAt => undef,
+      FinishedAt  => undef,
+    };
+  }
   return $self
 }
 
