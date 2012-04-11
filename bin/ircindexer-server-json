@@ -8,18 +8,20 @@ use warnings;
 ##  clear and reload network cfg in $cfg
 ##  re-init trawlers
 
-use Compress::Zlib qw/memGzip memGunzip/;
-use JSON::XS;
-
 ## Core:
+use Config;
 use Digest::SHA  qw/sha1_hex/;
 use File::Path   qw/make_path remove_tree/;
 use Scalar::Util qw/blessed/;
 use Storable     qw/dclone/;
 use POSIX ();
+use Time::HiRes;
 
 ## POE + HTTP
 use POE;
+use POE::Wheel::Run;
+use POE::Filter::Reference;
+
 use URI;
 use POEx::HTTP::Server;
 
@@ -34,7 +36,8 @@ use IRC::Indexer::Report::Network;
 
 use IRC::Indexer::Output::JSON;
 
-#use Devel::Size qw/total_size/;
+use Compress::Zlib qw/memGzip memGunzip/;
+use JSON::XS;
 
 my $opts = {
   help => sub {
@@ -99,6 +102,9 @@ my $obj = {
   Cfg    => undef,
 
   active_trawlers => {},
+  
+  workers_by_pid => {},
+  workers_by_wid => {},
 };
 
 my $state = { 
@@ -121,6 +127,8 @@ my $state = {
     
     HTTP_Responses   => 0,
   },
+  
+  pending_encode => [],
 };
 
 my $cfg = { 
@@ -129,6 +137,8 @@ my $cfg = {
   ServerPort => 8700,
   CacheDir   => undef,
   ListChans  => undef,
+  
+  MaxEncoders => 3,
   
   LogFile  => undef,
   LogLevel => undef,
@@ -309,10 +319,21 @@ sub poco_init_session {
         e_trawler_process
         
         e_cache_json
+
+        js_check_pending        
+        js_worker_stdout
+        js_worker_stderr
+        js_worker_error
+        js_worker_closed
+        js_worker_sigchld
         
       / ],
     ],
   );
+
+  ## e_* events bridge trawler sessions.
+  ## js_* events handle forked encoders.
+  ## h_* events bridge HTTP; they are added via state() in _start.
 
   log_to('session', 'debug', 'Session initialized');
 }
@@ -372,6 +393,8 @@ sub e_init_nets {
   } ## NETWORK
   
   $kernel->alarm('e_timer_chk' => time + 3);
+  
+  $kernel->alarm('js_check_pending' => Time::HiRes::time + 0.5);
 
   log_to('irc', 'info',
     "Trawling $total_servers servers across $total_nets networks"
@@ -405,7 +428,7 @@ sub e_timer_chk {
     my $this_net = $pool->{trawlers}->{$network};
     
     my $last_trawled = $this_net->{HasRun};
-    my $sp = 1;
+    my $sp = 0;
     unless ($last_trawled) {
       ## No trawlers have been run for this network, yet.
       ## Spin one up, set HasRun time.
@@ -416,8 +439,9 @@ sub e_timer_chk {
         next NETWORK     
       }
 
+      ## Space out our initial runs.
       log_to('irc', 'info', "Scheduling initial trawler for $network");
-      $kernel->alarm_add( 'e_trawler_run', time + ($sp+=0.5),
+      $kernel->alarm_add( 'e_trawler_run', Time::HiRes::time + ($sp+=0.5),
         $ArrayConf->{$network}->[0] 
       );
     }
@@ -532,11 +556,8 @@ sub e_trawler_process {
     ## sort ListChans:
     $info->channels if $cfg->{ListChans};
 
-    ## feed to JSONify
+    ## export the hash:
     my $s_info = $info->clone;
-    my $s_js = IRC::Indexer::Output::JSON->new(
-      Input => $s_info,
-    );
   
     ## NetInfo objects can get very large ...
     ## we serialize/compress them in-mem and revive them here:
@@ -557,15 +578,12 @@ sub e_trawler_process {
     ## process and grab new hash:
     my $n_info = $netinfo_obj->netinfo;
     undef $netinfo_obj;
+    ## preserve it for later Network reconstruction:
     $obj->{NetInfo}->{$network} = memGzip( encode_json($n_info) );
-  
-    my $n_js = IRC::Indexer::Output::JSON->new(
-      Input => $n_info,
-    );
   
     my $server_name  = $info->servername;
     $kernel->yield( 'e_cache_json',
-      $network, $server_name, $s_js, $n_js
+      $network, $server_name, $s_info, $n_info
     );
   }
      
@@ -604,13 +622,12 @@ sub e_trawler_process {
 sub e_cache_json {
   ## eventy frontend to cache_json()
   my $kernel = $_[KERNEL];
-  my ($network, $server, $s_js, $n_js) = @_[ARG0 .. $#_];  
-  my $s_hash = $s_js->dump;
-  my $n_hash = $n_js->dump;
-  cache_json( $s_hash, $network, $server );
-  cache_json( $n_hash, $network );
-  log_to('irc', 'info',
-    "Cached JSON: $network ($server)"
+  my ($network, $server, $s_hash, $n_hash) = @_[ARG0 .. $#_];  
+
+  ## Push network first.
+  push(@{ $state->{pending_encode} },
+    [ $n_hash, $network ],
+    [ $s_hash, $network, $server ],
   );
 }
 
@@ -715,8 +732,6 @@ sub cachedir_read {
   my $unzipped = memGunzip($data) if $data;
   return $unzipped // $data
 }
-
-## FIXME
 
 sub cache_json {
   my ($data, $network, $server) = @_;
@@ -1040,6 +1055,117 @@ sub post_request {
   ++$state->{stats}->{HTTP_Responses};
 }
 
+## Forkable worker states
+sub js_check_pending {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+  
+  $kernel->alarm('js_check_pending' => Time::HiRes::time + 0.5);
+
+  ## return if no pending encodes
+  return unless @{ $state->{pending_encode}//[] };
+
+  ## return if too many workers running
+  return if ($cfg->{MaxEncoders}||3) <=
+    scalar keys %{ $obj->{workers_by_pid}//{} };
+  
+  ## otherwise fork worker and put()
+  my $item = shift @{ $state->{pending_encode} };
+  my ($network) = @$item;
+  
+  log_to('session', 'debug', "Encoder spawn: $network");
+  
+  ## borrowed from PoCo Resolver:
+  my $perlpath = $Config{perlpath};
+  if ($^O ne 'VMS') {
+    $perlpath .= $Config{_exe}
+      unless $perlpath =~ m/$Config{_exe}$/i;
+  }
+  
+  my $forkable;
+  if ($^O eq 'MSWin32') {
+    ## sucks to be you!
+    $forkable = \&IRC::Indexer::Process::JSONify::worker;
+  } else {
+    $forkable = [
+      $perlpath, (map { "-I$_" } @INC),
+      '-MIRC::Indexer::Process::JSONify', '-e',
+      'IRC::Indexer::Process::JSONify->worker()'
+    ];
+  }
+  
+  my $wheel = POE::Wheel::Run->new(
+    Program => $forkable,
+    ErrorEvent  => 'js_worker_error',
+    StdoutEvent => 'js_worker_stdout',
+    StderrEvent => 'js_worker_stderr',
+    CloseEvent  => 'js_worker_closed',
+    StdioFilter => POE::Filter::Reference->new(),
+  );
+  
+  my $wheelid = $wheel->ID;
+  my $pidof   = $wheel->PID;
+  
+  $kernel->sig_child($pidof, 'js_worker_sigchld');
+  
+  $obj->{workers_by_pid} = $wheel;
+  $obj->{workers_by_wid} = $wheel;
+
+  ## Feed this worker.
+  $wheel->put($item);
+}
+
+sub js_worker_stdout {
+  my ($kernel, $item) = @_[KERNEL, ARG0];
+
+  log_to('session', 'debug', "Handling input from encoder");
+  
+  my ($json, $network, $server) = @$item;
+  unless ($json && $network) {
+    log_to('session', 'warn', "Invalid input from encoder!");
+    return
+  }
+
+  ## got JSON back, cache_json it
+  cache_json($json, $network, $server);
+  my $logstr = "Cached JSON for $network";
+  $logstr   .= " ($server)" if $server;
+  log_to('irc', 'info', $logstr);
+}
+
+sub js_worker_stderr {
+  my ($kernel, $err, $id) = @_[KERNEL, ARG0, ARG1];
+  log_to('session', 'warn', "Encoder reported err: $err");
+  ## these will die() and go away.
+}
+
+sub js_worker_closed {
+  my ($kernel, $wheelid) = @_[KERNEL, ARG0];
+
+  my $wheel = delete $obj->{workers_by_wid}->{$wheelid};
+  
+  if (defined $wheel) {
+    my $pidof = $wheel->PID;
+    $wheel->kill(9); ## just in case ...
+    delete $obj->{workers_by_pid}->{$pidof};
+  }
+}
+
+sub js_worker_error {
+  ## null-op; these should sigchld and go away
+}
+
+sub js_worker_sigchld {
+  ## child's gone
+  my ($kernel, $pidof) = @_[KERNEL, ARG1];
+  
+  log_to('session', 'debug', "Worker sig_chld: $pidof");
+
+  my $wheel;
+  return unless $wheel = delete $obj->{workers_by_pid}->{$pidof};
+  
+  my $wheelid = $wheel->ID;
+  delete $obj->{workers_by_wid}->{$wheelid};
+}
 
 sub start_indexer {
   if ($opts->{detach}) {

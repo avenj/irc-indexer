@@ -148,6 +148,18 @@ NetworkDir: /home/ircindex/networks
 ##  Choose wisely :-)
 #CacheDir: /home/ircindex/jsoncache
 
+## MaxEncoders:
+##
+## Workers are forked off to handle the potentially expensive 
+## JSON encoding of server trawl results.
+##
+## The JSON encoder has to, at some point, hold both the original 
+## hash and the resulting JSON in memory simultaneously.
+##
+## On systems without a lot of memory, you may not want to run
+## more than one forked encoder at the same time.
+MaxEncoders: 3
+
 ## ListChans:
 ##
 ## If ListChans is enabled, the server will create sorted lists of 
