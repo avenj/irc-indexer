@@ -96,6 +96,8 @@ sub failed {
     $self->report->finishedat(time);
   } else {
     return unless ref $self->report;
+    return "Unknown failure, no server()" 
+      if $self->done and not $self->report->server;
     return unless defined $self->report->status
       and $self->report->status eq 'FAIL';
   }
@@ -142,6 +144,7 @@ sub _start {
   my ($self, $kernel) = @_[OBJECT, KERNEL];
   
   $kernel->sig('INT', 'sess_sig_int');
+  $kernel->sig('TERM', 'sess_sig_int');
   
   $self->{sessid} = $_[SESSION]->ID();
   
@@ -224,6 +227,7 @@ sub tr_sig_chld {
   ## Worker's gone
   
   my $pidof = $_[ARG1];
+
   my $wheel = delete $self->{wheels}->{by_pid}->{$pidof};
   return unless ref $wheel;
   

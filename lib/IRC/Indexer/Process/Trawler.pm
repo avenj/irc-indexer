@@ -7,13 +7,14 @@ use warnings;
 
 use POE;
 
-use IRC::Indexer::Trawl::Bot;
+require IRC::Indexer::Trawl::Bot;
 
 use Storable qw/nfreeze thaw/;
 
 use bytes;
 
 sub worker {
+  $0 = "ircindexer TRAWL" unless $^O eq 'MSWin32';
   POE::Kernel->stop;
 
   binmode STDOUT;
@@ -37,10 +38,14 @@ sub worker {
         die "Trawl::Forkable passed invalid configuration"
           unless ref $conf eq 'HASH';
         
+        $0 = "ircindexer TRAWL $server" unless $^O eq 'MSWin32';
+        
         my $trawler = IRC::Indexer::Trawl::Bot->new(%$conf);
         $trawler->run();
         
         POE::Kernel->run();
+        
+        die $trawler->failed if $trawler->failed;
         
         my $report = $trawler->report->clone() || {
           NetName     => $server,
