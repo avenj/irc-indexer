@@ -15,7 +15,7 @@ sub new {
   my %args = @_ if @_;
   $args{lc $_} = delete $args{$_} for keys %args;
   
-  $self->{NoGlobalMOTD} = 1 unless $args{servermotds};
+  $self->{ServerMOTDs} = 1 if $args{servermotds};
   
   $self->{Network} = {
     Servers => {
@@ -103,9 +103,8 @@ sub add_server {
   my $servers = $network->{Servers};
 
   my $name = $info->server;
-  my $motd = $info->motd;  
   $servers->{$name}->{TrawledAt} = $info->finishedat;
-  $servers->{$name}->{MOTD} = $motd unless $self->{NoGlobalMOTD};
+  $servers->{$name}->{MOTD} = $info->motd if $self->{ServerMOTDs};
   
   ## these can all be overriden network-wide:
   $network->{GlobalUsers} = $info->users;
