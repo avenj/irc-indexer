@@ -97,10 +97,11 @@ GetOptions( $opts,
 my $obj = {
   Log    => undef,
   Cfg    => undef,
+
+  active_trawlers => {},
 };
 
 my $state = { 
-  active_trawlers => {},
   timers => { trawlers => {} },
   stats  => {
     Version => $IRC::Indexer::VERSION,
@@ -116,6 +117,7 @@ my $state = {
     
     LastTrawl         => 0,
     LastTrawledServer => undef,
+    LastTrawlerReaped => undef,
     
     HTTP_Responses   => 0,
   },
@@ -420,18 +422,18 @@ sub e_timer_chk {
       );
     }
 
-    unless (@{ $state->{active_trawlers}->{$network}//[] }) {
+    unless (@{ $obj->{active_trawlers}->{$network}//[] }) {
       log_to('irc', 'debug', "No active trawlers for $network");
     }
     
     my @pending;
     my $idx = 0;
-    TRAWL: for my $trawler (@{ $state->{active_trawlers}->{$network} }) {
+    TRAWL: for my $trawler (@{ $obj->{active_trawlers}->{$network} }) {
       if ($trawler->done) {
         ## Have a finished trawler.
         
         ## Drop this trawler from active_trawlers:
-        splice @{ $state->{active_trawlers}->{$network} }, $idx, 1;
+        splice @{ $obj->{active_trawlers}->{$network} }, $idx, 1;
 
         ## Splice this trawler's cf out of this network's ArrayConf:
         splice @{ $ArrayConf->{$network} }, $idx, 1;
@@ -485,7 +487,7 @@ sub e_trawler_run {
   $trawler->run();
   
   ## Add to active trawlers for this network
-  push(@{ $state->{active_trawlers}->{$network} }, $trawler );
+  push(@{ $obj->{active_trawlers}->{$network} }, $trawler );
 
   log_to('irc', 'debug', "Trawler run issued for $server");
 
@@ -507,11 +509,14 @@ sub e_trawler_process {
   }
   
   my $orig_server = $trawler->trawler_for;
+  $state->{stats}->{LastTrawlerReaped} = $orig_server;
 
   if (my $err = $trawler->failed) {
     log_to('irc', 'warn',
       "Trawler reports failure: $network ($orig_server): $err"
     );
+    ++$state->{stats}->{Fail}->{$network}->{$orig_server};
+    $state->{stats}->{LastFailure}->{$network} = "$orig_server: $err";
     return
   }
 
@@ -520,6 +525,8 @@ sub e_trawler_process {
   log_to('irc', 'info', 
     "Completed trawler: $network ($server)"
   );
+  
+  ++$state->{stats}->{Success}->{$network}->{$orig_server};
   
   my $info = $trawler->info;
   
@@ -812,7 +819,12 @@ sub h_stats {
     );
   } else {
     $resp->content_type('application/json');
-    my $ref = $state->{stats};
+    my @pending = grep( { 
+        @{ $obj->{active_trawlers}->{$_} } 
+      } 
+      keys %{ $obj->{active_trawlers} }
+    );
+    my $ref = { ActiveTrawlers => \@pending, %{$state->{stats}} };
     my $json = JSON::XS->new->utf8(1)->pretty->encode($ref);
     $resp->content($json);
   }

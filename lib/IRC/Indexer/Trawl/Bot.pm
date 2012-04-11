@@ -130,6 +130,7 @@ sub failed {
   return unless ref $self->info;
   
   if ($reason) {
+    carp "Trawl run failed: $reason" if $self->verbose;
     $self->info->status('FAIL');
     $self->info->failed($reason);
     $self->info->finishedat(time);
@@ -144,6 +145,8 @@ sub done {
   my ($self, $finished) = @_;
   
   if ($finished) {
+    carp "Trawler completed: ".$self->info->connectedto
+      if $self->verbose;
     $self->info->status('DONE');
     $self->info->finishedat(time());
   }
@@ -166,19 +169,13 @@ sub dump {
   return $self->info->netinfo
 }
 
-## POE (internal)
-sub _stop {
-#  carp "DEBUG trawl session stop"
-}
-
+sub _stop {}
 sub shutdown {
   my ($self, $kernel) = @_[OBJECT, KERNEL];
   
   $kernel->alarm('b_check_timeout') if ref $kernel;
   
-#  carp "DEBUG trawler shutdown called";
-  
-  warn "-> shutdown\n" if $self->verbose;
+  warn "-> Trawler shutdown called\n" if $self->verbose;
   
   $self->failed("shutdown before completion")
     unless $self->done or $self->failed;
@@ -201,6 +198,8 @@ sub _start {
   
   my $irc = POE::Component::IRC->spawn( %ircopts );
   $self->irc( $irc );
+
+  warn "-> Trawler spawned IRC\n" if $self->verbose;
   
   $irc->plugin_add('CTCP' =>
     POE::Component::IRC::Plugin::CTCP->new(
@@ -216,8 +215,9 @@ sub _start {
 
 sub b_retrieve_info {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
-  
   ## called via alarm() (in irc_001)
+
+  warn "-> Retrieving server information\n" if $self->verbose;
 
   my $irc = $self->irc;  
   
@@ -247,7 +247,7 @@ sub b_issue_cmd {
   ## most servers will announce lusers at connect-time:
   return if $cmd eq 'lusers' and $self->{State}->{Lusers};
   
-  warn "-> issuing $cmd\n" if $self->verbose;
+  warn "-> Issuing: $cmd\n" if $self->verbose;
   $self->irc->yield($cmd);
 }
 
@@ -272,6 +272,7 @@ sub b_check_timeout {
   $shutdown++ if time - $connectedat > $self->{timeout};
 
   if ($shutdown) {
+    warn "-> Posting shutdown to own session\n" if $self->verbose;
     $kernel->post( $_[SESSION], 'shutdown' );
   }
   
@@ -399,8 +400,6 @@ sub irc_322 {
     strip_color( strip_formatting($topic) )
   );
   
-  warn "chan -> $chan $users $topic\n" if $self->verbose;
-
   $users //= 0;
   $topic //= ''; 
   
