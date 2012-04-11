@@ -165,11 +165,12 @@ sub shutdown {
   my ($self, $kernel) = @_[OBJECT, KERNEL];
   
   $kernel->alarm('b_check_timeout') if ref $kernel;
+
+  ## FIXME postback for finished trawlers?
   
   warn "-> Trawler shutdown called\n" if $self->verbose;
-  
-  $self->failed("shutdown before completion")
-    unless $self->done or $self->failed;
+
+  $self->done(1);  
   $self->irc->call('shutdown')   if ref $self->irc;
   $self->irc(1);
 }

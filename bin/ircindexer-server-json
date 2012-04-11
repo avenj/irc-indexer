@@ -556,8 +556,7 @@ sub e_trawler_process {
     ## sort ListChans:
     $info->channels if $cfg->{ListChans};
 
-    ## export the hash:
-    my $s_info = $info->clone;
+    my $s_info = $info->netinfo;
   
     ## NetInfo objects can get very large ...
     ## we serialize/compress them in-mem and revive them here:
@@ -1141,6 +1140,9 @@ sub js_worker_stderr {
 
 sub js_worker_closed {
   my ($kernel, $wheelid) = @_[KERNEL, ARG0];
+  
+  ## If the worker closes STDOUT early, something is wrong.
+  ## Clean up.
 
   my $wheel = delete $obj->{workers_by_wid}->{$wheelid};
   

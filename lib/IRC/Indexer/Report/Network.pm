@@ -117,7 +117,7 @@ sub add_server {
 
   my $name = $info->server;
   $servers->{$name}->{TrawledAt} = $info->finishedat;
-  $servers->{$name}->{MOTD} = dclone( $info->motd//[] )
+  $servers->{$name}->{MOTD} = $info->motd
     if $self->{ServerMOTDs};
   
   ## these can all be overriden network-wide:
