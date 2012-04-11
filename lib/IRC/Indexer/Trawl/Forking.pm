@@ -58,6 +58,8 @@ sub run {
         _start
         _stop
         
+        sess_sig_int
+        
         tr_sig_chld
         
         tr_input
@@ -98,7 +100,7 @@ sub failed {
       and $self->report->status eq 'FAIL';
   }
   
-  return $self->report->failed
+  return 1
 }
 
 sub dump {
@@ -118,8 +120,15 @@ sub info {
 
 ## POE:
 sub _stop {
-  my ($self, $kernel) = @_[OBJECT, KERNEL];
+  $_[OBJECT]->kill_all; 
+}
 
+sub sess_sig_int {
+  $_[OBJECT]->kill_all;
+}
+
+sub kill_all {
+  my ($self) = @_;
   for my $pidof (keys %{ $self->{wheels}->{by_pid} }) {
     my $wheel = delete $self->{wheels}->{by_pid}->{$pidof};
     if (ref $wheel) {
@@ -131,6 +140,8 @@ sub _stop {
 
 sub _start {
   my ($self, $kernel) = @_[OBJECT, KERNEL];
+  
+  $kernel->sig('INT', 'sess_sig_int');
   
   $self->{sessid} = $_[SESSION]->ID();
   
