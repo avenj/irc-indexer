@@ -128,8 +128,8 @@ sub info {
 sub failed {
   my ($self, $reason) = @_;
   return unless ref $self->info;
+  
   if ($reason) {
-    $self->shutdown($poe_kernel);
     $self->info->status('FAIL');
     $self->info->failed($reason);
     $self->info->finishedat(time);
@@ -180,7 +180,8 @@ sub shutdown {
   
   warn "-> shutdown\n" if $self->verbose;
   
-  $self->done(1);
+  $self->failed("shutdown before completion")
+    unless $self->done or $self->failed;
   $self->irc->call('shutdown')   if ref $self->irc;
   $self->irc(1);
 }
@@ -296,16 +297,16 @@ sub irc_disconnected {
 sub irc_socketerr {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $err = $_[ARG0];
-  $kernel->post( $_[SESSION], 'shutdown' );
   $self->failed("irc_socketerr: $err");
+  $kernel->post( $_[SESSION], 'shutdown' );
 }
 
 sub irc_error {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $err = $_[ARG0];
   ## errored out. clean up and report failure status
-  $kernel->post( $_[SESSION], 'shutdown' );
   $self->failed("irc_error: $err") unless $self->done;
+  $kernel->post( $_[SESSION], 'shutdown' );
 }
 
 sub irc_001 {

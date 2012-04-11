@@ -109,17 +109,17 @@ sub add_server {
 
   my $name = $info->server;
   $servers->{$name}->{TrawledAt} = $info->finishedat;
-  $servers->{$name}->{MOTD} = dclone( $info->motd )
+  $servers->{$name}->{MOTD} = dclone( $info->motd//[] )
     if $self->{ServerMOTDs};
   
   ## these can all be overriden network-wide:
   $network->{GlobalUsers} = $info->users;
   $network->{OperCount}   = $info->opers;
   $network->{ChanCount}   = $info->totalchans;
-  $network->{HashChans}   = dclone( $info->chanhash );
+  $network->{HashChans}   = dclone( $info->chanhash//{} );
   $network->{ConnectedAt} = $info->connectedat;
   $network->{FinishedAt}  = $info->finishedat;
-  $network->{ListLinks}   = dclone( $info->links );
+  $network->{ListLinks}   = dclone( $info->links//[] );
   $network->{LastServer}  = $name;
 }
 

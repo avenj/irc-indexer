@@ -506,7 +506,6 @@ sub e_trawler_process {
     );
   }
   
-  my $server = $trawler->info->servername;
   my $orig_server = $trawler->trawler_for;
 
   if (my $err = $trawler->failed) {
@@ -515,6 +514,8 @@ sub e_trawler_process {
     );
     return
   }
+
+  my $server = $trawler->info->servername;
 
   log_to('irc', 'info', 
     "Completed trawler: $network ($server)"
