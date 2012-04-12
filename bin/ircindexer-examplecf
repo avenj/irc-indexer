@@ -1,5 +1,6 @@
 #!perl
 
+use 5.12.1;
 use strict;
 use warnings;
 
@@ -34,9 +35,10 @@ GetOptions(
   'show!' => \$show,
 );
 
+$cftype = lc($cftype||'');
 
-die "No --type specified\nShould be one of: httpd, spec, multi\n"
-  unless $cftype;
+die "Invalid --type\nShould be one of: httpd, spec\n"
+  unless $cftype and $cftype ~~ [qw/httpd spec/];
 
 if ($show) {
   print IRC::Indexer::Conf->get_example_cf($cftype);

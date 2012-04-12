@@ -94,6 +94,31 @@ sub find_nets {
 
 ## Example CF
 
+sub get_example_conf { get_example_cf(@_) }
+sub get_example_cf {
+  my ($self, $cftype) = @_;
+  my $method = 'example_cf_'.$cftype;
+  
+  unless ($self->can($method)) {
+    croak "Invalid example conf type: $cftype"
+  }
+
+  return $self->$method
+}
+
+sub write_example_conf { write_example_cf(@_) }
+sub write_example_cf {
+  my ($self, $cftype, $path) = @_;
+  croak "write_example_cf requires a type and path"
+    unless $cftype and $path;
+  
+  my $conf = $self->get_example_cf($cftype); 
+
+  open my $fh, '>', $path or die "open failed: $!\n";
+  print $fh $conf;
+  close $fh;
+}
+
 sub example_cf_spec {
   my $conf = <<END;
 ---
@@ -203,31 +228,6 @@ END
   return $conf
 }
 
-sub get_example_conf { get_example_cf(@_) }
-sub get_example_cf {
-  my ($self, $cftype) = @_;
-  my $method = 'example_cf_'.$cftype;
-  
-  unless ($self->can($method)) {
-    croak "Invalid example conf type: $cftype"
-  }
-
-  return $self->$method
-}
-
-sub write_example_conf { write_example_cf(@_) }
-sub write_example_cf {
-  my ($self, $cftype, $path) = @_;
-  croak "write_example_cf requires a type and path"
-    unless $cftype and $path;
-  
-  my $conf = $self->get_example_cf($cftype); 
-
-  open my $fh, '>', $path or die "open failed: $!\n";
-  print $fh $conf;
-  close $fh;
-}
-
 1;
 __END__
 
@@ -289,11 +289,10 @@ Returns the raw YAML for an example configuration file.
 
   IRC::Indexer::Conf->get_example_cf('httpd');
 
-Valid types are:
+Valid types, as of this writing, are:
 
   httpd
   spec
-  multi
 
 =head2 write_example_cf
 
