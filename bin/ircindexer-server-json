@@ -36,7 +36,7 @@ use IRC::Indexer::Report::Network;
 
 use IRC::Indexer::Output::JSON;
 
-use Compress::Zlib qw/memGzip memGunzip/;
+use Compress::Zlib qw/memGzip memGunzip $gzerrno gzopen/;
 use JSON::XS;
 
 my $opts = {
@@ -668,19 +668,24 @@ sub cachedir_write {
     my $dir_path = join '/', $cachedir, $network;
     make_path($dir_path) unless -e $dir_path;
     my $path = join '/', $dir_path, $hexified;
-    open my $fh, '>', $path
-      or die "cachedir_write; open failed: $path: $!";
-    print $fh memGzip($data);
-    close $fh;
+    my $gz = gzopen($path, 'wb') 
+      or die "gzopen failure: $path: $gzerrno";
+    while (my $chunk = substr($data, 0, 4096, '') ) { 
+      $gz->gzwrite($chunk) 
+        or die "gzwrite failure: $path: $gz->gzerror";
+    }
+    $gz->gzclose;
   } else {
     ## write compressed network file:
     ## $cachedir/$network.z
     my $path = join '/', $cachedir, $network .'.z' ;
-    open my $fh, '>', $path
-      or die "cachedir_write; open failed: $path: $!";
-    binmode $fh;
-    print $fh memGzip($data);
-    close $fh;
+    my $gz = gzopen($path, 'wb') 
+      or die "gzopen failure: $path: $gzerrno";
+    while (my $chunk = substr($data, 0, 4096, '') ) { 
+      $gz->gzwrite($chunk) 
+        or die "gzwrite failure: $path: $gz->gzerror";
+    }
+    $gz->gzclose;
   }
   return 1 
 }
@@ -700,24 +705,38 @@ sub cachedir_read {
     my $hexified = sha1_hex($server);
     my $path = join '/', $cachedir, $network, $hexified;
     return unless -r $path;
-    ## not fatal ... you just get nothing:
-    open my $fh, '<', $path or return;
-    binmode $fh;
-    { local $/; $data = <$fh> }
-    close $fh;
+
+    if ($gzipped) {
+      open my $fh, '<', $path or return;
+      binmode $fh;
+      { local $/; $data = <$fh> }
+      close $fh;
+    } else {
+      my $gz = gzopen($path, 'rb') 
+        or warn "gzopen failure: $gzerrno" and return;
+      1 while $gz->gzread($data) > 0;
+      $gz->gzclose;
+    }
+
   } else {
     ## try to find/read $cachedir/$network.z
     my $path = join '/', $cachedir, $network .'.z' ;
     return unless -r $path;
-    open my $fh, '<', $path or return;
-    binmode $fh;
-    { local $/; $data = <$fh> }
-    close $fh;
+    
+    if ($gzipped) {
+      open my $fh, '<', $path or return;
+      binmode $fh;
+      { local $/; $data = <$fh> }
+      close $fh; 
+    } else {
+      my $gz = gzopen($path, 'rb') 
+        or warn "gzopen failure: $gzerrno" and return;
+      1 while $gz->gzread($data) > 0;
+      $gz->gzclose;
+    }
   }
   
-  return $data if $gzipped;
-  my $unzipped = memGunzip($data) if $data;
-  return $unzipped // $data
+  return $data
 }
 
 sub cache_json {
