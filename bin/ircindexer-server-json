@@ -111,10 +111,10 @@ my $obj = {
 };
 
 my $state = { 
-  this_run_id => sha1_hex(Time::HiRes::time() . rand),
 
   timers => { trawlers => {} },
   stats  => {
+    RunID => sha1_hex(Time::HiRes::time() . rand),
     Version => $IRC::Indexer::VERSION,
     StartedAt => time,
     
@@ -132,8 +132,6 @@ my $state = {
     
     HTTP_Responses   => 0,
   },
-  
-  pending_encode => [],
 };
 
 my $cfg = { 
@@ -559,20 +557,15 @@ sub e_trawler_process {
 
     $n_info->{HashChans} = $s_info->{HashChans};
     
-    ## Try to push to encoders now.
-    ## js_push_pending will yield back if there's too many active.
-
-    push(@{ $state->{pending_encode} },
-      [ $n_info, $network ],
+    $kernel->call( $_[SESSION], 'js_push_pending',
+      [ $n_info, $network ]
     );
+    
     undef $n_info;
-    $kernel->call( $_[SESSION], 'js_push_pending');
-
-    push(@{ $state->{pending_encode} },
+    
+    $kernel->call( $_[SESSION], 'js_push_pending',
       [ $s_info, $network, $server ],
     );
-    undef $s_info;
-    $kernel->call( $_[SESSION], 'js_push_pending');
   }
 }
 
@@ -631,7 +624,7 @@ sub db_open {
       O_CREAT|O_RDWR, 0666, $DB_HASH
     or die "Failed DB tie: $dbpath: $!";
 
-  my $runid = $state->{this_run_id};
+  my $runid = $state->{stats}->{RunID};
   if ($this_cache{'_RUNID'} && $this_cache{'_RUNID'} ne $runid) {
     log_to('DB', 'warn', "Clearing stale DB: $network");
     delete $this_cache{$_} for keys %this_cache;
@@ -1059,20 +1052,17 @@ sub post_request {
 ## Forkable worker states
 sub js_push_pending {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
-  
-  ## return if no pending encodes
-  return unless @{ $state->{pending_encode}//[] };
+  my $item = $_[ARG0];
 
   ## yield back if too many workers running
   if ( ($cfg->{MaxEncoders}||10) 
         <= scalar keys %{ $obj->{workers_by_pid}//{} } 
   ){
-    $kernel->yield('js_push_pending');
+    $kernel->yield('js_push_pending', $item);
     return
   }
   
   ## otherwise fork worker and put()
-  my $item = shift @{ $state->{pending_encode} };
   my ($network) = @$item;
   
   log_to('session', 'debug', "Encoder spawn: $network");
