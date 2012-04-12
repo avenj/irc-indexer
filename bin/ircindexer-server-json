@@ -524,12 +524,6 @@ sub e_trawler_process {
 
   ## passed trawler objects marked as done (from _chk)
 
-  unless (blessed $trawler) {
-    log_to('irc', 'warn', 
-      "Cannot e_trawler_process unblessed trawler for $network"
-    );
-  }
-  
   my $orig_server = $trawler->trawler_for;
   $state->{stats}->{LastTrawlerReaped} = $orig_server;
 
@@ -561,9 +555,8 @@ sub e_trawler_process {
     my $netinfo_obj;
     if ($obj->{NetInfo}->{$network}) {
       my $stored = $obj->{NetInfo}->{$network};
-      my $this_netinfo_hash = thaw($stored);
       $netinfo_obj = IRC::Indexer::Report::Network->new(
-        FromHash => $this_netinfo_hash,
+        FromHash => $stored,
       );
     } else {
       $netinfo_obj = IRC::Indexer::Report::Network->new();
@@ -578,14 +571,13 @@ sub e_trawler_process {
     undef $netinfo_obj;
     ## preserve it for later Network reconstruction
     ## also passed as-is to the encoder, below
-    my $frozen = nfreeze($n_info);
-    $obj->{NetInfo}->{$network} = $frozen;
+    $obj->{NetInfo}->{$network} = $n_info;
     
     ## Try to push to encoders now.
     ## js_push_pending will yield back if there's too many active.
 
     push(@{ $state->{pending_encode} },
-      [ $frozen, $network ],
+      [ nfreeze($n_info), $network ],
     );
     $kernel->call( $_[SESSION], 'js_push_pending');
 
