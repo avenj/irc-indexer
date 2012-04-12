@@ -5,12 +5,6 @@ package IRC::Indexer::Trawl::Forking;
 ## Provide compatible methods w/ Bot::Trawl
 ## Other layers can use this with the same interface.
 
-## - fork off Process::Trawler
-## - pass opts
-## - wait for reply
-## - recreate info obj from reply
-## - set done/failed/etc appropriately
-
 use 5.12.1;
 use strict;
 use warnings;
@@ -251,8 +245,8 @@ sub tr_closed {
   my $wheel = delete $self->{wheels}->{by_wid}->{$wheelid};
   if (ref $wheel) {
     my $pidof = $wheel->PID;
-    $wheel->kill(9);
     delete $self->{wheels}->{by_pid}->{$pidof};
+    $wheel->kill(9);
   }
 }
 

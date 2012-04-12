@@ -188,6 +188,8 @@ CacheDir: /home/ircindex/jsoncache
 ##
 ## You might want a shorter per-trawler timeout if you are severely 
 ## limiting your MaxTrawlers.
+##
+## Defaults to 20; 0 or empty string '' disables.
 #MaxTrawlers: 10
 
 ## MaxEncoders:
@@ -197,8 +199,7 @@ CacheDir: /home/ircindex/jsoncache
 ## a lot of networks, you may want to throttle these to avoid
 ## resource starvation.
 ##
-## No limit if not specified. If you set MaxTrawlers, you probably 
-## want MaxEncoders, too.
+## Defaults to 20; 0 or empty string '' disables.
 #MaxEncoders: 10
 
 ## ListChans:

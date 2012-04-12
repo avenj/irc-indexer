@@ -403,14 +403,23 @@ sub session_sig_int {
 }
 
 sub _stop {
-  ## FIXME kill encoders if any are running
-  ## FIXME close DBs if any are open ($state->{openDB})
+  ## Run some cleanup if needed.
+  for my $pidof (keys %{ $obj->{workers_by_pid} }) {
+    my $wheel = delete $obj->{workers_by_pid}->{$pidof};
+    next unless ref $wheel;
+    my $wid   = $wheel->ID;
+    delete $obj->{workers_by_wid}->{$wid};
+    $wheel->kill(9);
+  }
+  
   if ($state->{openDB}) {
     for my $network (keys %{ $state->{openDB} }) {
       db_close($network);
     }
   }
   log_to('session', 'warn', "_stop received");
+
+  ## HTTP server should pick up shutdown and clean up.
   $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
 }
 
@@ -1146,8 +1155,8 @@ sub js_worker_closed {
   
   if (defined $wheel) {
     my $pidof = $wheel->PID;
-    $wheel->kill(9); ## just in case ...
     delete $obj->{workers_by_pid}->{$pidof};
+    $wheel->kill(9); ## just in case ...
   }
 }
 
