@@ -33,7 +33,7 @@ sub new {
   $self->verbose($args{verbose} || 0);
 
   $self->{timeout}   = $args{timeout}  || 120;
-  $self->{interval}  = $args{interval} || 10;
+  $self->{interval}  = $args{interval} || 5;
 
   $self->{ircserver} = $args{server} 
     || croak "No Server specified in new" ;
@@ -265,7 +265,7 @@ sub b_check_timeout {
     $kernel->post( $_[SESSION], 'shutdown' );
   }
   
-  $kernel->alarm( 'b_check_timeout', time + 10 );
+  $kernel->alarm( 'b_check_timeout', time + 1 );
 }
 
 ## PoCo::IRC handlers
@@ -305,7 +305,7 @@ sub irc_001 {
   my $this_server = $self->irc->server_name;
   $self->info->server( $this_server );
   ## let things settle out, then b_retrieve_info:
-  $kernel->alarm('b_retrieve_info', time + 3);
+  $kernel->alarm('b_retrieve_info', time + 2);
 }
 
 sub irc_375 {
@@ -435,7 +435,7 @@ IRC::Indexer::Trawl::Bot - indexing trawler instance
     Timeout => 120,
     
     ## Interval between commands (LIST/LINKS/LUSERS):
-    Interval => 10,
+    Interval => 5,
     
     ## Verbosity/debugging level:
     Verbose => 0,
@@ -489,8 +489,7 @@ L<IRC::Indexer::Report::Server/netinfo>
 
 The trawler attempts to be polite, spacing out requests for LINKS, 
 LUSERS, and LIST; you can fine-tune the interval between commands by 
-specifying a different B<interval> at construction (defaults to 15 
-seconds).
+specifying a different B<interval> at construction. 
 
 =head2 METHODS
 

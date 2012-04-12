@@ -132,7 +132,7 @@ Port: 6667
 #BindAddr:
 #UseIPV6:
 #Timeout: 90
-#Interval: 15
+#Interval: 5
 
 END
 
@@ -155,8 +155,11 @@ sub example_cf_httpd {
 #   Server: eris.oppresses.us
 #   Port: 6667
 #   Timeout: 90
-#   Interval: 15
+#   Interval: 5
 ##
+## If you have multiple .server files for one Network, their Servers
+## will be cycled.
+## Specifying a round-robin will also generally do what you mean.
 NetworkDir: /home/ircindex/networks
 
 ## CacheDir:
@@ -173,12 +176,29 @@ NetworkDir: /home/ircindex/networks
 ## cached.
 CacheDir: /home/ircindex/jsoncache
 
+## MaxTrawlers:
+##
+## If you are handling a lot of networks, you may want to limit
+## the number of forked trawlers that can be running at a given 
+## time.
+##
+## Only one trawler will run per network; in other words, the 
+## theoretical maximum number of trawlers if MaxTrawlers is not 
+## set is the number of configured networks.
+##
+## You might want a shorter per-trawler timeout if you are severely 
+## limiting your MaxTrawlers.
+#MaxTrawlers: 10
+
 ## MaxEncoders:
 ##
 ## Workers are forked off to handle the potentially expensive 
-## JSON encoding of server trawl results.
-## Default should be fine; you're only going to hit it on very 
-## expansive trawlers.
+## JSON encoding of server trawl results; if you're trawling 
+## a lot of networks, you may want to throttle these to avoid
+## resource starvation.
+##
+## No limit if not specified. If you set MaxTrawlers, you probably 
+## want MaxEncoders, too.
 #MaxEncoders: 10
 
 ## ListChans:

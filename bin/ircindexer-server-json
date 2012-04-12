@@ -141,7 +141,8 @@ my $cfg = {
   CacheDir   => undef,
   ListChans  => undef,
   
-  MaxEncoders => 10,
+  MaxEncoders => 20,
+  MaxTrawlers => 20,
   
   LogFile  => undef,
   LogLevel => undef,
@@ -478,14 +479,18 @@ sub e_trawler_run {
   ## takes an arrayref:
   ##  [ network, server, conf-as-hashref ]
   my ($kernel, $heap, $confitem) = @_[KERNEL, HEAP, ARG0];
-  
+
   my ($network, $server, $trawlcf) = @$confitem;
 
-  log_to('irc', 'debug', 
-    "Constructring new trawler: $network: $server"
-  );
+  ## Too many trawlers running.
+  my $current_count = keys %{$obj->{active_trawlers}};
+  if ($cfg->{MaxTrawlers} && $current_count >= $cfg->{MaxTrawlers}) {
+    $kernel->alarm_add( 'e_trawler_run', time + 1, $confitem );
+    return
+  }
   
   my $trawler = create_trawler(%$trawlcf);
+  log_to('irc', 'info', "Trawler run: $network: $server");
   $trawler->run();
   
   ## Add to active trawlers for this network
@@ -1055,10 +1060,9 @@ sub js_push_pending {
   my $item = $_[ARG0];
 
   ## yield back if too many workers running
-  if ( ($cfg->{MaxEncoders}||10) 
-        <= scalar keys %{ $obj->{workers_by_pid}//{} } 
-  ){
-    $kernel->yield('js_push_pending', $item);
+  my $current_workers = scalar keys %{ $obj->{workers_by_pid}//{} };
+  if ($cfg->{MaxEncoders} && $cfg->{MaxEncoders} <= $current_workers) {
+    $kernel->alarm_add('js_push_pending', Time::HiRes::time + 0.5, $item);
     return
   }
   
