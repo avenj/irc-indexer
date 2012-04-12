@@ -251,3 +251,30 @@ sub tr_closed {
 
 1;
 __END__
+
+=pod
+
+=head1 NAME
+
+IRC::Indexer::Trawl::Forking - Forking Trawl::Bot instances
+
+=head1 SYNOPSIS
+
+See L<IRC::Indexer::Trawl::Bot> for usage details.
+
+This carries the same interface, but trawlers are forked off rather than 
+run as asynchronous sessions.
+
+=head1 DESCRIPTION
+
+Uses L<POE::Wheel::Run> to manage forked trawlers running under their 
+own Perl interpreter.
+
+Carries exactly the same interface as L<IRC::Indexer::Trawl::Bot> and 
+can be used interchangably.
+
+=head1 AUTHOR
+
+Jon Portnoy <avenj@cobaltirc.org>
+
+=cut

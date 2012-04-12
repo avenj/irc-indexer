@@ -35,7 +35,7 @@ sub worker {
         ## Not necessarily "Reported server name" (ServerName)
         ## Same for reply to master.
         my ($server, $conf) = @$inputref;
-        die "Trawl::Forkable passed invalid configuration"
+        die "Process::Trawler passed invalid configuration"
           unless ref $conf eq 'HASH';
         
         $0 = "ircindexer TRAWL $server" unless $^O eq 'MSWin32';
@@ -53,7 +53,7 @@ sub worker {
           ConnectedTo => $server,
           FinishedAt  => time,
           Status => 'FAIL', 
-          Failed => 'report() retrieval failure in Trawl::Forkable',
+          Failed => 'report() retrieval failure in Process::Trawler',
         };
         
         my $frozen = nfreeze([ $server, $report ]);
@@ -75,3 +75,30 @@ sub worker {
 }
 
 1;
+__END__
+
+=pod
+
+=head1 NAME
+
+IRC::Indexer::Process::Trawler - Forkable Trawl::Bot session
+
+=head1 SYNOPSIS
+
+See L<IRC::Indexer::Trawl::Forking> and L<IRC::Indexer::Trawl::Bot>
+
+=head1 DESCRIPTION
+
+A forkable POE instance managing a L<IRC::Indexer::Trawl::Bot> instance; 
+this is the worker used by L<IRC::Indexer::Trawl::Forking> via 
+L<POE::Wheel::Run> and L<POE::Filter::Reference>.
+
+Given an array containing a server tag and a trawler configuration to 
+pass through to L<IRC::Indexer::Trawl::Bot>, runs a single trawler until 
+it is complete and returns a server information hash.
+
+=head1 AUTHOR
+
+Jon Portnoy <avenj@cobaltirc.org>
+
+=cut

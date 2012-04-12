@@ -1,6 +1,6 @@
 package IRC::Indexer::Process::JSONify;
 
-## Forkable JSON encoder.
+## Forking JSON encoder.
 ## Process refs, encode JSON, return to master and die.
 
 ## Pass me a reference:
@@ -64,3 +64,30 @@ sub worker {
 }
 
 1;
+__END__
+=pod
+
+=head1 NAME
+
+IRC::Indexer::Process::JSONify - Forking JSON encoder
+
+=head1 SYNOPSIS
+
+See B<ircindexer-server-json>
+
+=head1 DESCRIPTION
+
+A small forkable JSON encoder, usable by L<POE::Wheel::Run> wheels to 
+externally encode JSON.
+
+Given an array containing a hash, a network name, and possibly a server 
+name, returns an array containing a JSON hash, network name, and server 
+name (possibly undef).
+
+See: L<POE::Wheel::Run> and L<POE::Filter::Reference>
+
+=head1 AUTHOR
+
+Jon Portnoy <avenj@cobaltirc.org>
+
+=cut

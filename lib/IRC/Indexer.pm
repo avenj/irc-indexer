@@ -49,6 +49,10 @@ See the documentation or C<ircindexer -h> for details.
 See the perldoc for L<IRC::Indexer::Trawl::Bot> for more about 
 using the trawl bot itself as part of other POE-enabled applications.
 
+The Trawl::Bot instances run asynchronously within a single process; 
+L<IRC::Indexer::Trawl::Forking> can be used to run Trawl::Bot 
+instances as forked workers that immediately die when complete.
+
 See L<IRC::Indexer::POD::ServerSpec> and 
 L<IRC::Indexer::POD::NetworkSpec> for details on exported data.
 
