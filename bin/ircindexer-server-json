@@ -411,13 +411,12 @@ sub _stop {
 
 sub e_timer_chk {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
-  my $state_run = $state->{_hasrun};
+  my $state_run = $state->{hasrun}//={};
 
   ++$state->{stats}->{LoopTick};
   
   my @trawlers;
 
-  my $netidx = 0;
   my $sp = 0;
   NETWORK: for my $network (keys %$ArrayConf) {
     my $last_trawled = $state_run->{$network};    
@@ -427,7 +426,7 @@ sub e_timer_chk {
       $state_run->{$network} = time();
       
       unless (@{ $ArrayConf->{$network} }) {
-        log_to('irc', 'debug', "No trawlers to check for $network");
+        log_to('irc', 'warn', "No trawlers to start for $network");
         next NETWORK     
       }
 
@@ -437,7 +436,6 @@ sub e_timer_chk {
         $ArrayConf->{$network}->[0] 
       );
     }
-    ++$netidx;
   } ## NETWORK
 
   TRAWL: for my $network (keys %{ $obj->{active_trawlers} }) {
