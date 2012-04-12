@@ -44,9 +44,9 @@ sub worker {
         
         my $json = $jsify->dump;
         my $gzipped = memGzip($json);
-        ## Returns:
-        ##  [ $network, $server_name, $json ]
+
         my $frozen = nfreeze( [ $json, $gzipped, $network, $server ] );
+
         my $stream  = length($frozen) . chr(0) . $frozen ;
         my $written = syswrite(STDOUT, $stream);
         die $! unless $written == length $stream;
@@ -82,8 +82,8 @@ A small forkable JSON encoder, usable by L<POE::Wheel::Run> wheels to
 externally encode JSON.
 
 Given an array containing a hash, a network name, and possibly a server 
-name, returns an array containing a JSON hash, network name, and server 
-name (possibly undef).
+name, returns an array containing a JSON hash, the gzipped 
+equivalent thereof, network name, and server name (possibly undef).
 
 See: L<POE::Wheel::Run> and L<POE::Filter::Reference>
 

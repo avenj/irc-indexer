@@ -21,7 +21,7 @@ sub new {
   $self->{ServerMOTDs} = 1 if $args{servermotds};
 
   if ($args{fromhash}) {
-    $self->{Network} = dclone($args{fromhash});  
+    $self->{Network} = delete $args{fromhash};
   } else { 
     $self->{Network} = {
       Servers => {
@@ -42,6 +42,8 @@ sub new {
       FinishedAt  => undef,
     };
   }
+  
+  $self->{NOCHANS} = 1 if $args{nochannels};
   return $self
 }
 
@@ -51,13 +53,7 @@ sub info { netinfo(@_) }
 sub netinfo {
   my $self = shift;
   my %args = @_;
-  
-  if ($args{nochannels}) {
-    my $cloned = dclone($self->{Network});
-    delete $cloned->{HashChans};
-    return $cloned
-  }
-  
+    
   return $self->{Network}
 }
 
@@ -124,7 +120,8 @@ sub add_server {
   $network->{GlobalUsers} = $info->users;
   $network->{OperCount}   = $info->opers;
   $network->{ChanCount}   = $info->totalchans;
-  $network->{HashChans}   = $info->chanhash // {};
+  $network->{HashChans}   = $info->chanhash
+    unless $self->{NOCHANS};
   $network->{ConnectedAt} = $info->connectedat;
   $network->{FinishedAt}  = $info->finishedat;
   $network->{ListLinks}   = $info->links // [] ;
@@ -148,6 +145,9 @@ IRC::Indexer::Report::Network - Network information class for IRC::Indexer
   ## Tracking a lot of MOTDs will eat memory fast.
   my $network = IRC::Indexer::Report::Network->new(
     ServerMOTDs => 1,
+    
+    ## Disable channel tracking, perhaps:
+    NoChannels => 1,
   );
   
   ## Get ::Report::Server object from finished trawl bot:
@@ -179,12 +179,6 @@ Argument must be a L<IRC::Indexer::Report::Server> object.
 =head3 netinfo
 
 Returns a reference to the network information hash.
-
-You can exclude the channel list if you'd like to pull it out 
-separately, for example when serializing a result from a large network; 
-this will produced a cloned copy minus channels:
-
-  my $ninfo = $network->netinfo(NoChannels => 1);
 
 =head3 connectedat
 

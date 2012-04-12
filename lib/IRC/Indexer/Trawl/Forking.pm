@@ -39,6 +39,9 @@ sub new {
   ## Grab and save same opts as Bot::Trawl
   my %args = @_;
   $args{lc $_} = delete $args{$_} for keys %args;
+
+  $self->{POST} = delete $args{postback}
+    if $args{postback} and ref $args{postback};
   
   $self->{TrawlerOpts} = \%args;
   
@@ -208,7 +211,11 @@ sub tr_input {
   $self->{ReportObj} = $report;
   ## We're finished.
   $self->done(1);
-  delete $self->{wheels}
+  delete $self->{wheels};
+  if (my $postback = delete $self->{POST}) {
+    ## Send ourself in a postback.
+    $postback->($self);
+  }
 }
 
 sub tr_error {

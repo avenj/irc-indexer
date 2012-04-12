@@ -10,6 +10,8 @@ use warnings;
 
 ## Core:
 use Config;
+use DB_File;
+use Fcntl qw/:DEFAULT :flock/;
 use Digest::SHA  qw/sha1_hex/;
 use File::Path   qw/make_path remove_tree/;
 use Scalar::Util qw/blessed/;
@@ -109,6 +111,8 @@ my $obj = {
 };
 
 my $state = { 
+  this_run_id => sha1_hex(Time::HiRes::time() . rand),
+
   timers => { trawlers => {} },
   stats  => {
     Version => $IRC::Indexer::VERSION,
@@ -348,9 +352,6 @@ sub _start {
   ## init httpd
   my @htstates = poco_cfg_httpd();
 
-  ## if that worked it should be safe to clean cachedir
-  cachedir_clean() if $cfg->{CacheDir};
-  
   $kernel->call( $_[SESSION], 'e_init_nets' );
   
   ## add states from $state->{htevents}
@@ -404,9 +405,14 @@ sub session_sig_int {
 
 sub _stop {
   ## FIXME kill encoders if any are running
+  ## FIXME close DBs if any are open ($state->{openDB})
+  if ($state->{openDB}) {
+    for my $network (keys %{ $state->{openDB} }) {
+      db_close($network);
+    }
+  }
   log_to('session', 'warn', "_stop received");
   $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
-  cachedir_clean() if $cfg->{CacheDir};
 }
 
 sub e_timer_chk {
@@ -499,9 +505,9 @@ sub e_trawler_process {
   my ($network, $trawler) = @_[ARG0, ARG1];
 
   ## passed trawler objects marked as done (from _chk)
-  log_to('irc', 'info', "Processing trawler: $network: $orig_server");
 
   my $orig_server = $trawler->trawler_for;
+  log_to('irc', 'info', "Processing trawler: $network: $orig_server");
   $state->{stats}->{LastTrawlerReaped} = $orig_server;
 
   if (my $err = $trawler->failed) {
@@ -520,7 +526,7 @@ sub e_trawler_process {
       "Completed trawler: $network ($server)"
     );
   
-    ++$state->{stats}->{Success}->{$network}->{$orig_server};
+    ++$state->{stats}->{Success}->{$network}->{$server};
     
     ## sort ListChans if configured:
     $info->channels if $cfg->{ListChans};
@@ -532,9 +538,12 @@ sub e_trawler_process {
       my $stored = $obj->{NetInfo}->{$network};
       $netinfo_obj = IRC::Indexer::Report::Network->new(
         FromHash => $stored,
+        NoChannels => 1,
       );
     } else {
-      $netinfo_obj = IRC::Indexer::Report::Network->new();
+      $netinfo_obj = IRC::Indexer::Report::Network->new(
+        NoChannels => 1,
+      );
     }
 
     ## feed it this server's Info object:
@@ -547,6 +556,8 @@ sub e_trawler_process {
 
     ## preserve it for later Network reconstruction
     $obj->{NetInfo}->{$network} = $n_info;
+
+    $n_info->{HashChans} = $s_info->{HashChans};
     
     ## Try to push to encoders now.
     ## js_push_pending will yield back if there's too many active.
@@ -585,48 +596,142 @@ sub create_trawler {
   return $trawler
 }
 
-sub cachedir_clean {
-  my $cachedir = $cfg->{CacheDir};
-  return unless $cachedir;
+sub db_open {
+  my ($network, %dbopts) = @_;
+  $dbopts{lc $_} = $dbopts{$_} for keys %dbopts;
 
-  if (-e $cachedir) {
-    die "CacheDir exists but not writable"
-      unless -w $cachedir;
-    log_to('session', 'warn', "Cleaning up CacheDir");
-    remove_tree($cachedir) if -e $cachedir;
+  my $cachedir;
+  die "db_open called but no CacheDir configured"
+    unless $cachedir = $cfg->{CacheDir};
+
+  make_path($cachedir) unless -e $cachedir;
+
+  my $dbpath = join '/', $cachedir, $network;
+  my $lockpath = $dbpath . '.lock';
+
+  open my $lock_fh, '>', $lockpath
+    or die "lockfile open failed: $!";
+
+  my $timer = 0;
+  my $timeout = 3;
+  until ( flock $lock_fh, LOCK_EX | LOCK_NB ) {
+    if ($timer > $timeout) {
+      log_to('DB', 'warn', "Lock timed out.");
+      return
+    }
+    select undef, undef, undef, 0.1;
+    $timer += 0.1;
   }
-  make_path($cachedir);
+  print $lock_fh $$;
+  
+  $state->{locks}->{$network} = $lock_fh;
+
+  my %this_cache;
+  tie %this_cache, "DB_File", $dbpath,
+      O_CREAT|O_RDWR, 0666, $DB_HASH
+    or die "Failed DB tie: $dbpath: $!";
+
+  my $runid = $state->{this_run_id};
+  if ($this_cache{'_RUNID'} && $this_cache{'_RUNID'} ne $runid) {
+    log_to('DB', 'warn', "Clearing stale DB: $network");
+    delete $this_cache{$_} for keys %this_cache;
+  }
+  $this_cache{'_RUNID'} = $runid;
+
+  unless ($dbopts{gzip} || $dbopts{raw}) {
+    (tied %this_cache)->filter_fetch_value(
+      sub { $_ = memGunzip($_) }
+    );
+    (tied %this_cache)->filter_store_value(
+      sub { $_ = memGzip($_) }
+    );
+  }
+
+  $state->{openDB}->{$network} = \%this_cache;
+}
+
+sub db_write {
+  my ($data, $network, $server) = @_;
+  
+  my $opendb = $state->{openDB}->{$network};
+  
+  unless ($opendb && tied %$opendb) {
+    die "Attempted db_write on unopened DB ($network)"
+  }
+  
+  if ($server) {
+    $opendb->{$server} = $data;
+  } else {
+    $opendb->{'_NETMETA'} = $data;
+  }
   return 1
 }
 
+sub db_read {
+  my ($network, $server) = @_;
+
+  my $opendb = $state->{openDB}->{$network};
+
+  unless ($opendb && tied %$opendb) {
+    die "Attempted db_read on unopened DB ($network)"
+  }
+  
+  my $data;
+  if ($server) {
+    $data = $opendb->{$server};
+  } else {
+    $data = $opendb->{'_NETMETA'};
+  }
+  return $data
+}
+
+sub db_del_server {
+  my ($network, $server) = @_;
+  return unless $server;
+
+  my $opendb = $state->{openDB}->{$network};
+  
+  unless ($opendb && tied %$opendb) {
+    die "Attempted db_del_server on unopened DB ($network)"
+  }
+  
+  return delete $opendb->{$server}
+}
+
+sub db_close {
+  my ($network) = @_;
+  
+  my $cachedir;
+  die "db_close called but no CacheDir configured"
+    unless $cachedir = $cfg->{CacheDir};
+
+  my $dbpath = join '/', $cachedir, $network;
+  my $lockpath = $dbpath . '.lock';
+  
+  my $lock_fh  = delete $state->{locks}->{$network};
+  my $opendb   = delete $state->{openDB}->{$network};
+  
+  if ($lock_fh) {
+    close $lock_fh;
+    unlink $lockpath;
+  }
+  
+  if ($opendb) {
+    untie %$opendb;
+  }
+}
+
 sub cachedir_write {
-  my ($data, $zipped, $network, $server) = @_;
+  my ($zipped, $network, $server) = @_;
   return unless $network;
 
   my $cachedir;
   die "cachedir_write called but no CacheDir configured"
     unless $cachedir = $cfg->{CacheDir};
 
-  if ($server) {
-    ## write compressed server file:
-    ## $cachedir/$network/$HASH
-    my $hexified = sha1_hex($server);
-    my $dir_path = join '/', $cachedir, $network;
-    make_path($dir_path) unless -e $dir_path;
-    my $path = join '/', $dir_path, $hexified;    
-    open my $fh, '>', $path
-      or die "open failure in cachedir_write: $!";
-    binmode $fh;
-    print $fh $zipped;
-    close $fh;
-  } else {
-    my $path = join '/', $cachedir, $network .'.z' ;
-    open my $fh, '>', $path
-      or die "open failure in cachedir_write: $!";
-    binmode $fh;
-    print $fh $zipped;
-    close $fh;
-  }
+  db_open($network, Raw => 1);
+  db_write($zipped, $network, $server);
+  db_close($network);
   return 1 
 }
 
@@ -638,43 +743,10 @@ sub cachedir_read {
   my $cachedir;
   die "cachedir_read called but no CacheDir configured"
     unless $cachedir = $cfg->{CacheDir};
-  
-  my $data;
-  if ($server) {
-    ## try to find/read $cachedir/$network/$HASH
-    my $hexified = sha1_hex($server);
-    my $path = join '/', $cachedir, $network, $hexified;
-    return unless -r $path;
 
-    if ($gzipped) {
-      open my $fh, '<', $path or return;
-      binmode $fh;
-      { local $/; $data = <$fh> }
-      close $fh;
-    } else {
-      my $gz = gzopen($path, 'rb') 
-        or warn "gzopen failure: $gzerrno" and return;
-      1 while $gz->gzread($data) > 0;
-      $gz->gzclose;
-    }
-  } else {
-    ## try to find/read $cachedir/$network.z
-    my $path = join '/', $cachedir, $network .'.z' ;
-    return unless -r $path;
-    
-    if ($gzipped) {
-      open my $fh, '<', $path or return;
-      binmode $fh;
-      { local $/; $data = <$fh> }
-      close $fh; 
-    } else {
-      my $gz = gzopen($path, 'rb') 
-        or warn "gzopen failure: $gzerrno" and return;
-      1 while $gz->gzread($data) > 0;
-      $gz->gzclose;
-    }
-  }
-  
+  db_open($network, Raw => $gzipped);
+  my $data = db_read($network, $server);
+  db_close($network);
   return $data
 }
 
@@ -684,14 +756,14 @@ sub cache_json {
   if ($server) {
     ## store a server's json
     if ($cfg->{CacheDir}) {
-      cachedir_write($data, $gzip, $network, $server);
+      cachedir_write($gzip, $network, $server);
     } else {
       $jsmemcache->{Servers}->{$network}->{$server} = $data;
     }
   } else {
     ## store a network's json
     if ($cfg->{CacheDir}) {
-      cachedir_write($data, $gzip, $network);
+      cachedir_write($gzip, $network);
     } else {
       $jsmemcache->{Networks}->{$network} = $data;
     }
@@ -829,20 +901,16 @@ sub h_server {
   my $uri = URI->new($req->uri);
   if ($uri->query && $uri->query =~ /^gzip/) {
     $resp->content_type('application/x-gzip');
-    $resp->header( 'Content-Length' => bytes::length($zipped) );
-    while (my $chunk = substr($zipped, 0, 4096, '') ) {
-      $resp->send($chunk);
-    }
+    $resp->content($zipped);
   } else {  
     my $json = memGunzip($zipped);
     undef $zipped;
     $resp->content_type('application/json');
-    $resp->header( 'Content-Length' => bytes::length($json) );
-    while (my $chunk = substr($json, 0, 4096, '') ) {
-      $resp->send($chunk);
-    }
+    $resp->content($json);
   }
 
+  $resp->respond;
+  
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_server $network $server");
@@ -968,19 +1036,15 @@ sub h_network {
 
   if ($uri->query && $uri->query =~ /^gzip/) {
     $resp->content_type('application/x-gzip');
-    $resp->header( 'Content-Length' => bytes::length($zipped) );
-    while (my $chunk = substr($zipped, 0, 4096, '') ) {
-      $resp->send($chunk);
-    }
+    $resp->content($zipped);
   } else {  
     my $json = memGunzip($zipped);
     undef $zipped;
     $resp->content_type('application/json');
-    $resp->header( 'Content-Length' => bytes::length($json) );
-    while (my $chunk = substr($json, 0, 4096, '') ) {
-      $resp->send($chunk);
-    }
+    $resp->content($json);
   }
+  
+  $resp->respond;
 
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
