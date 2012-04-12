@@ -14,6 +14,7 @@ use warnings;
 use IRC::Indexer::Output::JSON;
 
 use Storable qw/nfreeze thaw/;
+use Compress::Zlib qw/memGzip/;
 
 use bytes;
 
@@ -42,10 +43,10 @@ sub worker {
         );
         
         my $json = $jsify->dump;
-        
+        my $gzipped = memGzip($json);
         ## Returns:
         ##  [ $network, $server_name, $json ]
-        my $frozen = nfreeze( [ $json, $network, $server ] );
+        my $frozen = nfreeze( [ $json, $gzipped, $network, $server ] );
         my $stream  = length($frozen) . chr(0) . $frozen ;
         my $written = syswrite(STDOUT, $stream);
         die $! unless $written == length $stream;

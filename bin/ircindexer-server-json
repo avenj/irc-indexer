@@ -499,6 +499,7 @@ sub e_trawler_process {
   my ($network, $trawler) = @_[ARG0, ARG1];
 
   ## passed trawler objects marked as done (from _chk)
+  log_to('irc', 'info', "Processing trawler: $network: $orig_server");
 
   my $orig_server = $trawler->trawler_for;
   $state->{stats}->{LastTrawlerReaped} = $orig_server;
@@ -526,8 +527,6 @@ sub e_trawler_process {
 
     my $s_info = $info->netinfo;
   
-    ## NetInfo objects can get very large ...
-    ## we serialize/compress them in-mem and revive them here:
     my $netinfo_obj;
     if ($obj->{NetInfo}->{$network}) {
       my $stored = $obj->{NetInfo}->{$network};
@@ -537,7 +536,7 @@ sub e_trawler_process {
     } else {
       $netinfo_obj = IRC::Indexer::Report::Network->new();
     }
-    
+
     ## feed it this server's Info object:
     $netinfo_obj->add_server($info);
     undef $info;
@@ -545,8 +544,8 @@ sub e_trawler_process {
     ## process and grab new hash:
     my $n_info = $netinfo_obj->netinfo;
     undef $netinfo_obj;
+
     ## preserve it for later Network reconstruction
-    ## also passed as-is to the encoder, below
     $obj->{NetInfo}->{$network} = $n_info;
     
     ## Try to push to encoders now.
@@ -564,8 +563,6 @@ sub e_trawler_process {
     undef $s_info;
     $kernel->call( $_[SESSION], 'js_push_pending');
   }
-     
-  log_to('irc', 'info', "Rescheduled trawler: $network: $orig_server");
 }
 
 ## Helpers
@@ -603,7 +600,7 @@ sub cachedir_clean {
 }
 
 sub cachedir_write {
-  my ($data, $network, $server) = @_;
+  my ($data, $zipped, $network, $server) = @_;
   return unless $network;
 
   my $cachedir;
@@ -616,25 +613,19 @@ sub cachedir_write {
     my $hexified = sha1_hex($server);
     my $dir_path = join '/', $cachedir, $network;
     make_path($dir_path) unless -e $dir_path;
-    my $path = join '/', $dir_path, $hexified;
-    my $gz = gzopen($path, 'wb') 
-      or die "gzopen failure: $path: $gzerrno";
-    while (my $chunk = substr($data, 0, 4096, '') ) { 
-      $gz->gzwrite($chunk) 
-        or die "gzwrite failure: $path: $gz->gzerror";
-    }
-    $gz->gzclose;
+    my $path = join '/', $dir_path, $hexified;    
+    open my $fh, '>', $path
+      or die "open failure in cachedir_write: $!";
+    binmode $fh;
+    print $fh $zipped;
+    close $fh;
   } else {
-    ## write compressed network file:
-    ## $cachedir/$network.z
     my $path = join '/', $cachedir, $network .'.z' ;
-    my $gz = gzopen($path, 'wb') 
-      or die "gzopen failure: $path: $gzerrno";
-    while (my $chunk = substr($data, 0, 4096, '') ) { 
-      $gz->gzwrite($chunk) 
-        or die "gzwrite failure: $path: $gz->gzerror";
-    }
-    $gz->gzclose;
+    open my $fh, '>', $path
+      or die "open failure in cachedir_write: $!";
+    binmode $fh;
+    print $fh $zipped;
+    close $fh;
   }
   return 1 
 }
@@ -688,19 +679,19 @@ sub cachedir_read {
 }
 
 sub cache_json {
-  my ($data, $network, $server) = @_;
+  my ($data, $gzip, $network, $server) = @_;
 
   if ($server) {
     ## store a server's json
     if ($cfg->{CacheDir}) {
-      cachedir_write($data, $network, $server);
+      cachedir_write($data, $gzip, $network, $server);
     } else {
       $jsmemcache->{Servers}->{$network}->{$server} = $data;
     }
   } else {
     ## store a network's json
     if ($cfg->{CacheDir}) {
-      cachedir_write($data, $network);
+      cachedir_write($data, $gzip, $network);
     } else {
       $jsmemcache->{Networks}->{$network} = $data;
     }
@@ -1068,17 +1059,14 @@ sub js_worker_stdout {
 
   log_to('session', 'debug', "Handling input from encoder");
   
-  my ($json, $network, $server) = @$item;
-  unless ($json && $network) {
+  my ($json, $zip, $network, $server) = splice @$item, 0, 4;
+  unless ($network) {
     log_to('session', 'warn', "Invalid input from encoder!");
     return
   }
 
-  ## FIXME encoder will return gzipped also
-  ## cleanup cache_json to write gzipped data directly?
-
   ## got JSON back, cache_json it
-  cache_json($json, $network, $server);
+  cache_json($json, $zip, $network, $server);
   my $logstr = "Cached JSON for $network";
   $logstr   .= " ($server)" if $server;
   log_to('irc', 'info', $logstr);

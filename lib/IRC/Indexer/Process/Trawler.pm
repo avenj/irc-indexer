@@ -47,7 +47,7 @@ sub worker {
         
         die $trawler->failed if $trawler->failed;
         
-        my $report = $trawler->report->clone() || {
+        my $report = $trawler->report->netinfo() || {
           NetName     => $server,
           ServerName  => $server,
           ConnectedTo => $server,
