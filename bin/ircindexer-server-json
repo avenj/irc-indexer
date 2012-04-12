@@ -16,6 +16,7 @@ use Scalar::Util qw/blessed/;
 use Storable     qw/dclone thaw nfreeze freeze/;
 use POSIX ();
 use Time::HiRes;
+require bytes;
 
 ## POE + HTTP
 use POE;
@@ -275,6 +276,7 @@ sub poco_cfg_httpd {
 
 
   POEx::HTTP::Server->spawn(
+    retry => 0,
     inet => {
       LocalAddr => $cfg->{BindAddr},
       LocalPort => $cfg->{ServerPort},
@@ -717,7 +719,6 @@ sub cachedir_read {
       1 while $gz->gzread($data) > 0;
       $gz->gzclose;
     }
-
   } else {
     ## try to find/read $cachedir/$network.z
     my $path = join '/', $cachedir, $network .'.z' ;
@@ -847,7 +848,6 @@ sub h_stats {
       . "Version: $IRC::Indexer::VERSION\n\n"
     );
   } else {
-    $resp->content_type('application/json');
     my @pending = grep( { 
         @{ $obj->{active_trawlers}->{$_} } 
       } 
@@ -855,6 +855,7 @@ sub h_stats {
     );
     my $ref = { ActiveTrawlers => \@pending, %{$state->{stats}} };
     my $json = JSON::XS->new->utf8(1)->pretty->encode($ref);
+    $resp->content_type('application/json');
     $resp->content($json);
   }
 
@@ -894,14 +895,19 @@ sub h_server {
   my $uri = URI->new($req->uri);
   if ($uri->query && $uri->query =~ /^gzip/) {
     $resp->content_type('application/x-gzip');
-    $resp->content( $zipped );
+    $resp->header( 'Content-Length' => bytes::length($zipped) );
+    while (my $chunk = substr($zipped, 0, 4096, '') ) {
+      $resp->send($chunk);
+    }
   } else {  
     my $json = memGunzip($zipped);
+    undef $zipped;
     $resp->content_type('application/json');
-    $resp->content($json);
+    $resp->header( 'Content-Length' => bytes::length($json) );
+    while (my $chunk = substr($json, 0, 4096, '') ) {
+      $resp->send($chunk);
+    }
   }
-
-  $resp->respond;
 
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
@@ -915,22 +921,8 @@ sub h_servlist {
   my ($req, $resp, $network) = @_[ARG0, ARG1, ARG2];
   ## handed off by h_network
 
-  my $servlist = [];
-  
-  if ($cfg->{CacheDir}) {
-    my $netjson = cachedir_read('json', $network);
-  
-    if ($netjson) {
-      my $net_hash = decode_json($netjson);
-      my $s_hash   = $net_hash->{Servers} // {};
-      $servlist = [ keys %$s_hash ];
-    }
-  } else {
-    $servlist = [ keys %{ $jsmemcache->{Servers}->{$network}//{} } ];
-  }
+  my $servlist = [keys %{$state->{stats}->{Success}->{$network}}];
 
-  ## we have JSON::XS available ...
-  ## eh, use Output::JSON to get pretty-print opts anyway:
   my $jsify = IRC::Indexer::Output::JSON->new(
     Input => $servlist,
   );
@@ -1042,14 +1034,19 @@ sub h_network {
 
   if ($uri->query && $uri->query =~ /^gzip/) {
     $resp->content_type('application/x-gzip');
-    $resp->content( $zipped );
+    $resp->header( 'Content-Length' => bytes::length($zipped) );
+    while (my $chunk = substr($zipped, 0, 4096, '') ) {
+      $resp->send($chunk);
+    }
   } else {  
     my $json = memGunzip($zipped);
+    undef $zipped;
     $resp->content_type('application/json');
-    $resp->content($json);
+    $resp->header( 'Content-Length' => bytes::length($json) );
+    while (my $chunk = substr($json, 0, 4096, '') ) {
+      $resp->send($chunk);
+    }
   }
-
-  $resp->respond;
 
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
