@@ -306,7 +306,7 @@ sub irc_001 {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   $self->info->status('CONNECTED');
   ## let things settle out, then b_retrieve_info:
-  $kernel->alarm('b_retrieve_info', time + 5);
+  $kernel->alarm('b_retrieve_info', time + 8);
 }
 
 sub irc_375 {

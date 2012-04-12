@@ -102,7 +102,7 @@ sub failed {
       and $self->report->status eq 'FAIL';
   }
   
-  return 1
+  return $self->report->failed
 }
 
 sub dump {
