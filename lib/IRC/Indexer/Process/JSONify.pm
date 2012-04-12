@@ -33,8 +33,7 @@ sub worker {
         my $inputref = thaw( substr($buf, 0, $read_bytes, "") );
         $read_bytes = undef;
         
-        my ($st_hash, $network, $server) = @$inputref;
-        my $hash = thaw($st_hash);
+        my ($hash, $network, $server) = @$inputref;
         die "Invalid arguments for worker"
           unless ref $hash eq 'HASH';
 

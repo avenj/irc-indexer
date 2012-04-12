@@ -52,6 +52,14 @@ using the trawl bot itself as part of other POE-enabled applications.
 See L<IRC::Indexer::POD::ServerSpec> and 
 L<IRC::Indexer::POD::NetworkSpec> for details on exported data.
 
+=head1 BUGS
+
+Frankly, the fundamentals of this project were laid out on a hungover 
+Saturday morning. It hasn't been tested on very many different IRCDs; 
+there are probably things broken I'm not aware of.
+
+Bugs can be emailed directly, if you like -- see L</AUTHOR>.
+
 =head1 AUTHOR
 
 Jon Portnoy <avenj@cobaltirc.org>

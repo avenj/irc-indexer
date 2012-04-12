@@ -214,9 +214,6 @@ sub b_retrieve_info {
   my $irc = $self->irc;  
   
   my $info = $self->info;
-  ## set up hash appropriately:
-  my $server = $self->{ircserver};
-  $info->servername( $irc->server_name );
   
   my $network = $irc->isupport('NETWORK') || $irc->server_name;
   $info->netname($network);
@@ -305,8 +302,10 @@ sub irc_error {
 sub irc_001 {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   $self->info->status('CONNECTED');
+  my $this_server = $self->irc->server_name;
+  $self->info->server( $this_server );
   ## let things settle out, then b_retrieve_info:
-  $kernel->alarm('b_retrieve_info', time + 8);
+  $kernel->alarm('b_retrieve_info', time + 3);
 }
 
 sub irc_375 {

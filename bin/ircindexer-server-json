@@ -577,12 +577,12 @@ sub e_trawler_process {
     ## js_push_pending will yield back if there's too many active.
 
     push(@{ $state->{pending_encode} },
-      [ nfreeze($n_info), $network ],
+      [ $n_info, $network ],
     );
     $kernel->call( $_[SESSION], 'js_push_pending');
 
     push(@{ $state->{pending_encode} },
-      [ nfreeze($s_info), $network, $server ],
+      [ $s_info, $network, $server ],
     );
     $kernel->call( $_[SESSION], 'js_push_pending');
   }
