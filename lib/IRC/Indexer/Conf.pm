@@ -176,11 +176,25 @@ NetworkDir: /home/ircindex/networks
 ## cached.
 CacheDir: /home/ircindex/jsoncache
 
+## Forking:
+##
+## If Forking is enabled, trawlers will be spawned as external
+## processes rather than running asynchronously as part of a 
+## single process.
+##
+## A trawler that is composing a very large list of channels
+## can use a fair bit of CPU; if you can spare a little extra
+## memory during runs and have the cores for it, fork them instead.
+Forking: 0
+
 ## MaxTrawlers:
 ##
 ## If you are handling a lot of networks, you may want to limit
 ## the number of forked trawlers that can be running at a given 
 ## time.
+##
+## If Forking is not enabled, this controls the number of async 
+## trawlers that will be ->run() at a time.
 ##
 ## Only one trawler will run per network; in other words, the 
 ## theoretical maximum number of trawlers if MaxTrawlers is not 

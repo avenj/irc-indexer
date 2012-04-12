@@ -34,7 +34,9 @@ use IRC::Indexer;
 use IRC::Indexer::Conf;
 use IRC::Indexer::Logger;
 
+use IRC::Indexer::Trawl::Bot;
 use IRC::Indexer::Trawl::Forking;
+
 use IRC::Indexer::Report::Network;
 
 use IRC::Indexer::Output::JSON;
@@ -140,7 +142,8 @@ my $cfg = {
   ServerPort => 8700,
   CacheDir   => undef,
   ListChans  => undef,
-  
+
+  Forking => 0,
   MaxEncoders => 20,
   MaxTrawlers => 20,
   
@@ -588,7 +591,16 @@ sub e_trawler_process {
 sub create_trawler {
   my %trawlopts = @_;
   my $this_cf = \%trawlopts;
-  my $trawler = IRC::Indexer::Trawl::Forking->new(
+  
+  my $trawler_class;
+  if ($cfg->{Forking}) {
+    $trawler_class = 'Trawl::Forking';
+  } else {
+    $trawler_class = 'Trawl::Bot';
+  }
+  $trawler_class = 'IRC::Indexer::'.$trawler_class;
+  
+  my $trawler = $trawler_class->new(
     Server => $this_cf->{Server},
     Port   => $this_cf->{Port},
     Nickname => $this_cf->{Nickname},

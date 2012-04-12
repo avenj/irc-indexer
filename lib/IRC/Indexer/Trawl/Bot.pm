@@ -126,6 +126,9 @@ sub failed {
     $self->info->failed($reason);
     $self->info->finishedat(time);
   } else {
+    return unless ref $self->info;
+    return "Unknown failure, no server()"
+      if $self->done and not $self->info->server;
     return unless defined $self->info->status 
            and $self->info->status eq 'FAIL';
   }
@@ -143,7 +146,7 @@ sub done {
   }
 
   return unless ref $self->info;  
-  return unless defined $self->info->status 
+  return unless defined $self->info->status
          and $self->info->status ~~ [qw/DONE FAIL/];
   return $self->info->status
 }

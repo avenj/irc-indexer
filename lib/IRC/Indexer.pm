@@ -44,14 +44,15 @@ network stats via HTTP.
 
 L<ircindexer-single> can be used to trawl a single server in one shot, 
 exporting to YAML, JSON, or Perl.
-See the documentation or C<ircindexer -h> for details.
+See the documentation or C<ircindexer-single -h> for details.
 
 See the perldoc for L<IRC::Indexer::Trawl::Bot> for more about 
 using the trawl bot itself as part of other POE-enabled applications.
 
 The Trawl::Bot instances run asynchronously within a single process; 
 L<IRC::Indexer::Trawl::Forking> can be used to run Trawl::Bot 
-instances as forked workers that immediately die when complete.
+instances as forked workers that immediately die when complete, if you 
+prefer.
 
 See L<IRC::Indexer::POD::ServerSpec> and 
 L<IRC::Indexer::POD::NetworkSpec> for details on exported data.
