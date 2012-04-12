@@ -744,21 +744,21 @@ sub cachedir_read {
 }
 
 sub cache_json {
-  my ($data, $gzip, $network, $server) = @_;
+  my ($gzip, $network, $server) = @_;
 
   if ($server) {
     ## store a server's json
     if ($cfg->{CacheDir}) {
       cachedir_write($gzip, $network, $server);
     } else {
-      $jsmemcache->{Servers}->{$network}->{$server} = $data;
+      $jsmemcache->{Servers}->{$network}->{$server} = memGunzip($gzip);
     }
   } else {
     ## store a network's json
     if ($cfg->{CacheDir}) {
       cachedir_write($gzip, $network);
     } else {
-      $jsmemcache->{Networks}->{$network} = $data;
+      $jsmemcache->{Networks}->{$network} = memGunzip($gzip);
     }
   }
 }
@@ -1113,14 +1113,14 @@ sub js_worker_stdout {
 
   log_to('session', 'debug', "Handling input from encoder");
   
-  my ($json, $zip, $network, $server) = splice @$item, 0, 4;
+  my ($zip, $network, $server) = splice @$item, 0, 4;
   unless ($network) {
     log_to('session', 'warn', "Invalid input from encoder!");
     return
   }
 
   ## got JSON back, cache_json it
-  cache_json($json, $zip, $network, $server);
+  cache_json($zip, $network, $server);
   my $logstr = "Cached JSON for $network";
   $logstr   .= " ($server)" if $server;
   log_to('irc', 'info', $logstr);

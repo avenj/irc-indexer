@@ -45,7 +45,7 @@ sub worker {
         my $json = $jsify->dump;
         my $gzipped = memGzip($json);
 
-        my $frozen = nfreeze( [ $json, $gzipped, $network, $server ] );
+        my $frozen = nfreeze( [ $gzipped, $network, $server ] );
 
         my $stream  = length($frozen) . chr(0) . $frozen ;
         my $written = syswrite(STDOUT, $stream);

@@ -136,23 +136,25 @@ NetworkDir: /home/ircindex/networks
 
 ## CacheDir:
 ##
-## If CacheDir is specified, rather than caching JSON in memory,
-## it is serialized to disk.
-##
 ## Large pools of trawlers will store quite a bit of data after 
 ## a few runs have completed.
 ## This trades some performance for significant memory savings.
 ##
-## IMPORTANT:
-##  Any preexisting contents of the CacheDir will be deleted.
-##  Choose wisely :-)
-#CacheDir: /home/ircindex/jsoncache
+## You probably want this.
+##
+## If a CacheDir is not specified, resultsets will live in memory;
+## additionally, due to the nature of the forking encoders,
+## there will be some extra processing overhead when results are 
+## cached.
+CacheDir: /home/ircindex/jsoncache
 
 ## MaxEncoders:
 ##
 ## Workers are forked off to handle the potentially expensive 
 ## JSON encoding of server trawl results.
-MaxEncoders: 10
+## Default should be fine; you're only going to hit it on very 
+## expansive trawlers.
+#MaxEncoders: 10
 
 ## ListChans:
 ##
