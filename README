@@ -30,14 +30,31 @@ DESCRIPTION
     network stats via HTTP.
 
     ircindexer-single can be used to trawl a single server in one shot,
-    exporting to YAML, JSON, or Perl. See the documentation or `ircindexer
-    -h' for details.
+    exporting to YAML, JSON, or Perl. See the documentation or
+    `ircindexer-single -h' for details.
 
     See the perldoc for IRC::Indexer::Trawl::Bot for more about using the
     trawl bot itself as part of other POE-enabled applications.
 
+    The Trawl::Bot instances run asynchronously within a single process;
+    IRC::Indexer::Trawl::Forking can be used to run Trawl::Bot instances as
+    forked workers that immediately die when complete, if you prefer.
+
     See IRC::Indexer::POD::ServerSpec and IRC::Indexer::POD::NetworkSpec for
     details on exported data.
+
+TODO
+    The postback interface for session notification is incomplete and
+    untested as of 0.1.
+
+    Tests are currently terrible.
+
+BUGS
+    Frankly, the fundamentals of this project were laid out on a hungover
+    Saturday morning. It hasn't been tested on very many different IRCDs;
+    there are probably things broken I'm not aware of.
+
+    Bugs can be emailed directly, if you like -- see AUTHOR.
 
 AUTHOR
     Jon Portnoy <avenj@cobaltirc.org>

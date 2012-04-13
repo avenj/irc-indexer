@@ -7,34 +7,35 @@ use Carp;
 
 use File::Find;
 
-use Storable qw/dclone/;
-
 use YAML::XS ();
 
 sub new { bless {}, shift }
 
 sub slurp {
   my ($self, $path) = @_;
+  
   my $slurped;
-  open my $fh, '<:encoding(utf8)', $path or croak "open failed: $!";
-  { local $/; $slurped = <$fh> }
-  close $fh;
+  
+  if (ref $path eq 'GLOB') {
+    local $/; $slurped = <$path>;
+  } else {
+    open my $fh, '<:encoding(utf8)', $path 
+      or croak "Conf open failed: $path: $!";
+    { local $/; $slurped = <$fh> }
+    close $fh;
+  }
+
   return $slurped
 }
 
 sub parse_conf {
   my ($self, $path) = @_;
-  
-  unless (-e $path && -r $path) {
-    croak "Could not read conf at $path: $!"
-  }
-  
   my $yaml = $self->slurp($path);
-  
-  croak "No data returned from $path" unless $yaml;
+  croak "No data returned from parse_conf: $path" 
+    unless $yaml;
 
   my $ref = YAML::XS::Load($yaml);
-  
+
   return $ref
 }
 
@@ -43,7 +44,8 @@ sub parse_nets {
   
   my $nethash = {};
   
-  my @specfiles = $self->find_nets($dir);
+  my @specfiles = ref $dir eq 'ARRAY' ?  @$dir
+                  : $self->find_nets($dir) ;
 
   SERV: for my $specpath (@specfiles) {
     my $this_spec = $self->parse_conf($specpath);
@@ -56,14 +58,10 @@ sub parse_nets {
       croak "specfile missing Network definition: $specpath"
     }
 
-    unless ( index($this_spec->{Network}, '%') == -1 ) {
-      croak "'%' is not valid in network names"
-    }
-    
     my $servname = $this_spec->{Server};
     my $netname  = $this_spec->{Network};
     
-    $nethash->{$netname}->{$servname} = dclone($this_spec);
+    $nethash->{$netname}->{$servname} = $this_spec;
   }
 
   return $nethash
@@ -291,17 +289,25 @@ Methods can be called as either class or object methods.
 
 =head2 parse_conf
 
-Takes a file path.
+Takes either a file path or a previously-opened filehandle.
 
 Read and parse a specified YAML configuration file, returning the 
 deserialized contents.
 
+parse_conf will croak() if the path cannot be read or does not 
+contain YAML.
+
+L<YAML::XS> will throw an exception if the YAML is not valid.
+
 =head2 parse_nets
 
-Calls L</find_nets> on a specified directory and processes all of the 
-returned server spec files.
+Takes either a directory or an array reference containing a 
+previously-discovered list of server spec files.
+
+Calls L</find_nets> to discover server spec files.
 
   IRC::Indexer::Conf->parse_nets($spec_dir);
+  IRC::Indexer::Conf->parse_nets(\@specfiles);
 
 Returns a hash with the following structure:
 

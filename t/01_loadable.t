@@ -1,4 +1,6 @@
-use Test::More tests => 11;
+use Test::More tests => 14;
+
+use File::Spec;
 
 BEGIN {
   use_ok( 'IRC::Indexer' );
@@ -17,3 +19,8 @@ BEGIN {
   use_ok( 'IRC::Indexer::Output::YAML') ;
   use_ok( 'IRC::Indexer::Output::Dumper') ;
 }
+
+new_ok( 'IRC::Indexer::Trawl::Bot'     => [ Server => 'localhost']);
+new_ok( 'IRC::Indexer::Trawl::Forking' => [ Server => 'localhost']);
+
+new_ok( 'IRC::Indexer::Logger' => [ LogFile => File::Spec->devnull ]);

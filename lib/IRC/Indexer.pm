@@ -57,6 +57,13 @@ prefer.
 See L<IRC::Indexer::POD::ServerSpec> and 
 L<IRC::Indexer::POD::NetworkSpec> for details on exported data.
 
+=head1 TODO
+
+The postback interface for session notification is incomplete and 
+untested as of 0.1.
+
+Tests are currently terrible.
+
 =head1 BUGS
 
 Frankly, the fundamentals of this project were laid out on a hungover 

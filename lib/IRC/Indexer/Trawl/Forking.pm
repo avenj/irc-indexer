@@ -88,6 +88,10 @@ sub failed {
   my ($self, $reason) = @_;
   
   if ($reason) {
+    unless (ref $self->report) {
+      $self->report( IRC::Indexer::Report::Server->new() );
+      $self->report->connectedto( $self->trawler_for );
+    }
     $self->report->status('FAIL');
     $self->report->failed($reason);
     $self->report->finishedat(time);
@@ -113,7 +117,9 @@ sub dump {
 
 sub report { info(@_) }
 sub info {
-  return $_[0]->{ReportObj}
+  my ($self, $reportobj) = @_;
+  $self->{ReportObj} = $reportobj if ref $reportobj;
+  return $self->{ReportObj}
 }
 
 
@@ -194,7 +200,10 @@ sub tr_input {
   my ($server, $info_h) = @$input;
   unless (ref $info_h eq 'HASH') {
     warn "tr_input received invalid input from worker";
-    return
+    $info_h = {
+      Status => 'FAIL',
+      Failed => "Invalid input from worker",
+    };
   }
 
   ## Re-create Report::Server obj

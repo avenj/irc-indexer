@@ -35,6 +35,12 @@ provides:
   IRC::Indexer::Output::YAML:
     file: lib/IRC/Indexer/Output/YAML.pm
     version: 0
+  IRC::Indexer::Process::JSONify:
+    file: lib/IRC/Indexer/Process/JSONify.pm
+    version: 0
+  IRC::Indexer::Process::Trawler:
+    file: lib/IRC/Indexer/Process/Trawler.pm
+    version: 0
   IRC::Indexer::Report::Network:
     file: lib/IRC/Indexer/Report/Network.pm
     version: 0
@@ -44,21 +50,31 @@ provides:
   IRC::Indexer::Trawl::Bot:
     file: lib/IRC/Indexer/Trawl/Bot.pm
     version: 0
+  IRC::Indexer::Trawl::Forking:
+    file: lib/IRC/Indexer/Trawl/Forking.pm
+    version: 0
   IRC::Indexer::Trawl::Multi:
     file: lib/IRC/Indexer/Trawl/Multi.pm
     version: 0
 requires:
+  Carp: 0
+  Compress::Zlib: 0
+  DB_File: 0
   Data::Dumper: 0
+  Digest::SHA: 0
+  File::Find: 0
+  File::Path: 0
   Getopt::Long: 0
   IRC::Utils: 0
   JSON::XS: 0
   Log::Handler: 0
   POE: 1.311
-  POE::Component::IRC::State: 6.74
+  POE::Component::IRC: 6.74
   POEx::HTTP::Server: 0
   POSIX: 0
   Scalar::Util: 0
   Storable: 0
+  Time::HiRes: 0
   URI: 0
   YAML::XS: 0
   perl: v5.12.1

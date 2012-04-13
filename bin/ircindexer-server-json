@@ -449,7 +449,7 @@ sub e_timer_chk {
 
       ## Space out our initial runs.
       log_to('irc', 'info', "Scheduling initial trawler for $network");
-      $kernel->alarm_add( 'e_trawler_run', Time::HiRes::time + ($sp+=1),
+      $kernel->alarm_add( 'e_trawler_run', time + ($sp+=1),
         $ArrayConf->{$network}->[0] 
       );
     }
@@ -484,7 +484,7 @@ sub e_timer_chk {
     }
   } ## TRAWL
 
-  $kernel->alarm('e_timer_chk' => Time::HiRes::time + 0.5);
+  $kernel->alarm('e_timer_chk' => time + 1);
 }
 
 sub e_trawler_run {
@@ -502,13 +502,11 @@ sub e_trawler_run {
   }
   
   my $trawler = create_trawler(%$trawlcf);
-  log_to('irc', 'info', "Trawler run: $network: $server");
   $trawler->run();
+  log_to('irc', 'info', "Trawler run: $network: $server");
   
   ## Add to active trawlers for this network
   $obj->{active_trawlers}->{$network} = $trawler;
-
-  log_to('irc', 'debug', "Trawler run issued for $server");
 
   ++$state->{stats}->{TrawlersExecuted};
   $state->{stats}->{LastTrawl} = time;

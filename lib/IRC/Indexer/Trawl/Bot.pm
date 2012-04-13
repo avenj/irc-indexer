@@ -265,7 +265,8 @@ sub b_check_timeout {
 
   if ($shutdown) {
     warn "-> Posting shutdown to own session\n" if $self->verbose;
-    $kernel->post( $_[SESSION], 'shutdown' );
+    $kernel->post( $_[SESSION], 'shutdown' )
+      if $_[SESSION] eq $_[SENDER];
   }
   
   $kernel->alarm( 'b_check_timeout', time + 1 );
@@ -414,7 +415,7 @@ __END__
 
 =head1 NAME
 
-IRC::Indexer::Trawl::Bot - indexing trawler instance
+IRC::Indexer::Trawl::Bot - Indexing trawler instance
 
 =head1 SYNOPSIS
 
@@ -493,6 +494,9 @@ L<IRC::Indexer::Report::Server/netinfo>
 The trawler attempts to be polite, spacing out requests for LINKS, 
 LUSERS, and LIST; you can fine-tune the interval between commands by 
 specifying a different B<interval> at construction. 
+
+See L<IRC::Indexer::Trawl::Forking> for an interface-compatible forked
+trawler instance.
 
 =head2 METHODS
 
