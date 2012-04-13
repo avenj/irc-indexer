@@ -15,7 +15,6 @@ use Fcntl qw/:DEFAULT :flock/;
 use Digest::SHA  qw/sha1_hex/;
 use File::Path   qw/make_path remove_tree/;
 use Scalar::Util qw/blessed/;
-use Storable     qw/dclone thaw nfreeze freeze/;
 use POSIX ();
 use Time::HiRes;
 require bytes;
@@ -521,24 +520,26 @@ sub e_trawler_process {
   log_to('irc', 'info', "Processing trawler: $network: $orig_server");
   $state->{stats}->{LastTrawlerReaped} = $network;
 
-  if ($trawler->failed) {
-    my $err = $trawler->failed;
+  if (my $err = $trawler->failed) {
     log_to('irc', 'warn',
-      "Trawler reports failure: $network ($orig_server): $err"
+      "Trawler failed: $network ($orig_server): $err"
     );
+
+    $state->{stats}->{LastFailure}->{$network} = {
+      Target => $orig_server,
+      Error  => $err,
+      TS     => time,
+    };
+
     ++$state->{stats}->{Fail}->{$network}->{$orig_server};
-    $state->{stats}->{LastFailure}->{$network} = "$orig_server: $err";
   } else {
-
     my $info = $trawler->info;
-
     my $server = $info->servername;
+    ++$state->{stats}->{Success}->{$network}->{$server};
 
     log_to('irc', 'info', 
       "Completed trawler: $network ($server)"
     );
-  
-    ++$state->{stats}->{Success}->{$network}->{$server};
     
     ## sort ListChans if configured:
     $info->channels if $cfg->{ListChans};
