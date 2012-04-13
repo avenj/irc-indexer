@@ -220,7 +220,23 @@ sub _start {
     ),
   );
   
-  $irc->yield(register => 'all');
+  $irc->yield(register => qw/
+    connected
+    disconnected
+    socketerr
+    error
+    
+    001
+    
+    375 372 376
+
+    364 365
+    
+    251 252
+    
+    322 323
+  / );
+
   $irc->yield(connect => {});
   
   $kernel->alarm( 'b_check_timeout', time + 5 );
@@ -442,7 +458,7 @@ IRC::Indexer::Trawl::Bot - Indexing trawler instance
 
   ## Inside a POE session:
   
-  my $trawl = IRC::Indexer::Trawl::Bot->new(
+  my $trawl = IRC::Indexer::Trawl::Bot->spawn(
     ## Server address and port:
     Server  => 'irc.cobaltirc.org',
     Port    => 6667,
@@ -463,17 +479,22 @@ IRC::Indexer::Trawl::Bot - Indexing trawler instance
     Interval => 5,
     
     ## Verbosity/debugging level:
-    Verbose => 0,    
+    Verbose => 0,
+    
+    ## Optionally use postback interface:
+    Postback => $_[SESSION]->postback('trawler_done', $some_tag);    
   );
 
-  $trawl->run;
-  
-  ## Later:
-  if ( $trawl->done ) {
-    my $report = $trawl->report;
-    my $hash = $report->netinfo;
+  ## Using postback:
+  sub trawler_done {
+    my ($kernel, $heap) = @_[KERNEL, HEAP];
+    my $tag     = $_[ARG0]->[0];
+    my $trawler = $_[ARG1]->[0];
+    my $report = $trawler->report;
     . . .
   }
+
+  ## Or without postbacks:
   
   ## Spawn a bunch of trawlers in a loop:
   my $trawlers;
@@ -486,8 +507,14 @@ IRC::Indexer::Trawl::Bot - Indexing trawler instance
   ## Check on them later:
   SERVER: for my $server (keys %$trawlers) {
     my $trawl = $trawlers->{$server};
+    
     next SERVER unless $trawl->done;
-    my $netname = $trawl->info->network;
+    
+    next SERVER if $trawl->failed;
+    
+    my $report  = $trawl->report;
+    my $netname = $report->network;
+    my $hash    = $report->netinfo;
     . . . 
   }
 
@@ -503,6 +530,11 @@ specified timeout (defaults to 120 seconds) is reached.
 When the trawler is finished, $trawl->done() will be boolean true; if 
 there was some error, $trawl->failed() will be true and will contain a 
 scalar string describing the error.
+
+If a postback was specified at construction time, the event will be 
+posted when a trawler has finished. $_[ARG1]->[0] will contain the 
+trawler object; $_[ARG0] will be an array reference containing any 
+arguments specified in your 'Postback =>' option after the event name.
 
 The B<report()> method returns the L<IRC::Indexer::Report::Server> 
 object.
@@ -521,6 +553,25 @@ trawler instance.
 
 =head2 METHODS
 
+=head3 new
+
+Construct, but do not L</run>, a trawler instance.
+
+Use new() when you'd like to create pending trawler instances that will 
+sit around until instructed to L</run>.
+
+new() can be used to construct trawlers before any POE sessions are 
+initialized (but you lose the ability to use postbacks).
+
+See L</SYNOPSIS> for constructor options.
+
+=head3 spawn
+
+Construct and immediately run a trawler from within a running 
+L<POE::Session>.
+
+See L</SYNOPSIS> for constructor options.
+
 =head3 trawler_for
 
 Returns the server this trawler was constructed for.
@@ -529,14 +580,22 @@ Returns the server this trawler was constructed for.
 
 Start the trawler session.
 
+You should only call run() if you're not using the spawn() interface.
+
+spawn() will call run() for you.
+
 =head3 failed
 
 If a trawler has encountered an error, B<failed> will return true and 
 contain a string describing the problem.
 
+It's safest to skip failed runs when processing output; if a report 
+object does exist, the reported data is probably incomplete or broken.
+
 =head3 done
 
-Returns boolean true if the trawler instance has finished.
+Returns boolean true if the trawler instance has finished; it may still 
+be L</failed> and have an incomplete or nonexistant report.
 
 =head3 report
 

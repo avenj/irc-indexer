@@ -31,6 +31,9 @@ IRC::Indexer - IRC server stats collection via POE
   ## Spawn a httpd serving JSON:
   $ ircindexer-server-json -c httpd.cf
 
+  ## See IRC::Indexer::Trawl::Bot for more on using trawlers from 
+  ## within your own POE-enabled apps.
+
 =head1 DESCRIPTION
 
 A set of modules and utilities useful for trawling IRC networks, 
@@ -58,9 +61,6 @@ See L<IRC::Indexer::POD::ServerSpec> and
 L<IRC::Indexer::POD::NetworkSpec> for details on exported data.
 
 =head1 TODO
-
-The postback interface for session notification is incomplete and 
-untested as of 0.1.
 
 Tests are currently terrible.
 
