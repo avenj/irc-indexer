@@ -521,7 +521,8 @@ sub e_trawler_process {
   log_to('irc', 'info', "Processing trawler: $network: $orig_server");
   $state->{stats}->{LastTrawlerReaped} = $network;
 
-  if (my $err = $trawler->failed) {
+  if ($trawler->failed) {
+    my $err = $trawler->failed;
     log_to('irc', 'warn',
       "Trawler reports failure: $network ($orig_server): $err"
     );
@@ -1112,7 +1113,7 @@ sub js_push_pending {
     StdioFilter => POE::Filter::Reference->new(),
   );
 
-  ++$state->{stats}->{Wheels}->{Created};
+  ++$state->{stats}->{EncoderWheels}->{Created};
   
   my $wheelid = $wheel->ID;
   my $pidof   = $wheel->PID;
@@ -1137,7 +1138,7 @@ sub js_worker_stdout {
     return
   }
   
-  ++$state->{stats}->{Wheels}->{Success};
+  ++$state->{stats}->{EncoderWheels}->{Success};
 
   ## got JSON back, cache_json it
   cache_json($zip, $network, $server);
@@ -1150,21 +1151,16 @@ sub js_worker_stderr {
   my ($kernel, $err, $id) = @_[KERNEL, ARG0, ARG1];
   log_to('session', 'warn', "Encoder reported err: $err");
   
-  ++$state->{stats}->{Wheels}->{Died};
+  ++$state->{stats}->{EncoderWheels}->{Died};
   ## these will die() and go away.
 }
 
 sub js_worker_closed {
-  my ($kernel, $wheelid) = @_[KERNEL, ARG0];
-  
-  ## If the worker closes STDOUT early, something is wrong.
-  ## Clean up.
-  
-  ++$state->{stats}->{Wheels}->{Closed};
-
+  my ($kernel, $wheelid) = @_[KERNEL, ARG0];  
   my $wheel = delete $obj->{workers_by_wid}->{$wheelid};
   
   if (defined $wheel) {
+    ++$state->{stats}->{EncoderWheels}->{Closed};
     my $pidof = $wheel->PID;
     delete $obj->{workers_by_pid}->{$pidof};
     $wheel->kill(9); ## just in case ...
@@ -1174,7 +1170,6 @@ sub js_worker_closed {
 sub js_worker_error {
   ## null-op; these should sigchld and go away
   ## (and you get no data either way)
-  ++$state->{stats}->{Wheels}->{ErrEvent};
 }
 
 sub js_worker_sigchld {
@@ -1183,7 +1178,7 @@ sub js_worker_sigchld {
   
   log_to('session', 'debug', "Worker sig_chld: $pidof");
 
-  ++$state->{stats}->{Wheels}->{SIGCHLD};
+  ++$state->{stats}->{EncoderWheels}->{SIGCHLD};
 
   my $wheel;
   return unless $wheel = delete $obj->{workers_by_pid}->{$pidof};
