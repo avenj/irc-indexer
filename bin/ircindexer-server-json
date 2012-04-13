@@ -916,7 +916,7 @@ sub h_server {
   }
 
   my $uri = URI->new($req->uri);
-  if ($uri->query && $uri->query =~ /^gzip/) {
+  if ($uri->query && $uri->query =~ /^gzip/i) {
     $resp->content_type('application/x-gzip');
     $resp->content($zipped);
   } else {  
@@ -1051,7 +1051,7 @@ sub h_network {
 
   ## otherwise, try to serve a net hash:
 
-  if ($uri->query && $uri->query =~ /^gzip/) {
+  if ($uri->query && $uri->query =~ /^gzip/i) {
     $resp->content_type('application/x-gzip');
     $resp->content($zipped);
   } else {  
