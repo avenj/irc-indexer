@@ -1,4 +1,4 @@
-use Test::More tests => 53;
+use Test::More tests => 55;
 
 BEGIN {
   use_ok( 'IRC::Indexer::Report::Server' );
@@ -31,6 +31,9 @@ is( $server->server, 'eris.oppresses.us', 'server() get' );
 
 ok( $server->network('blackcobalt'), 'network() set' );
 is( $server->network, 'blackcobalt', 'network() get' );
+
+ok( $server->ircd('hybrid-7'), 'ircd() set' );
+is( $server->ircd, 'hybrid-7', 'ircd() get' );
 
 ok( $server->motd("MOTD line"), 'motd() new motd' );
 ok( $server->motd("MOTD line 2"), 'motd() append' );
@@ -129,6 +132,7 @@ is_deeply( $servers,
       ],
       
       TrawledAt => $ts,
+      IRCD => 'hybrid-7',
     },
   },
   'servers() compare'

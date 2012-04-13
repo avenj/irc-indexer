@@ -178,7 +178,7 @@ sub ircd {
   my ($self, $version) = @_;
   return $self->netinfo->{IRCD} = $version
     if defined $version;
-  return $self->netinfo->{HashChans}
+  return $self->netinfo->{IRCD}
 }
 
 sub add_channel {
