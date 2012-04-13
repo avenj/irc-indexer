@@ -26,6 +26,9 @@ sub new {
     $self->{Network} = {
       Servers => {
        ## ServerName => {
+       ##   TrawledAt =>
+       ##   IRCD      =>
+       ## # optional:
        ##   MOTD => [],
        ## }
       },
@@ -113,6 +116,7 @@ sub add_server {
 
   my $name = $info->server;
   $servers->{$name}->{TrawledAt} = $info->finishedat;
+  $servers->{$name}->{IRCD} = $info->ircd;
   $servers->{$name}->{MOTD} = $info->motd
     if $self->{ServerMOTDs};
   

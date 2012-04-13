@@ -53,7 +53,7 @@ sub netinfo {
 
 sub connectedto {
   my ($self, $server) = @_;
-  return $self->netinfo->{ConnectedTo} = $server if $server;
+  return $self->netinfo->{ConnectedTo} = $server if defined $server;
   return $self->netinfo->{ConnectedTo}
 }
 
@@ -101,14 +101,14 @@ sub netname { network(@_) }
 sub network {
   my ($self, $netname) = @_;
   return $self->netinfo->{NetName} = $netname
-    if $netname;
+    if defined $netname;
   return $self->netinfo->{NetName}
 }
 
 sub servername { server(@_) }
 sub server {
   my ($self, $server) = @_;
-  return $self->netinfo->{ServerName} = $server if $server;
+  return $self->netinfo->{ServerName} = $server if defined $server;
   return $self->netinfo->{ServerName}
 }
 
@@ -119,7 +119,7 @@ sub blank_motd {
 
 sub motd {
   my ($self, $line) = @_;
-  push(@{ $self->netinfo->{MOTD} }, $line) if $line;
+  push(@{ $self->netinfo->{MOTD} }, $line) if defined $line;
   return $self->netinfo->{MOTD}
 }
 
@@ -150,7 +150,10 @@ sub links {
 
 sub chancount { totalchans(@_) }
 sub totalchans {
-  my ($self) = @_;
+  ## usually automagically updated
+  my ($self, $count) = @_;
+  return $self->netinfo->{ChanCount} = $count
+    if defined $count;
   return $self->netinfo->{ChanCount}
 }
 
@@ -168,6 +171,13 @@ sub chanhash {
   my ($self, $hash) = @_;
   return $self->netinfo->{HashChans} = $hash 
     if $hash and ref $hash eq 'HASH';
+  return $self->netinfo->{HashChans}
+}
+
+sub ircd {
+  my ($self, $version) = @_;
+  return $self->netinfo->{IRCD} = $version
+    if defined $version;
   return $self->netinfo->{HashChans}
 }
 
@@ -297,6 +307,10 @@ not necessarily the announced server name (see L</server>)
 Get or set the actual server name; this is the name announced by the 
 server, not necessarily the address we originally connected to.
 
+=head3 ircd
+
+Get or set the server version.
+
 =head3 blank_motd
 
 Clear the existing MOTD.
@@ -380,6 +394,7 @@ The B<netinfo> method returns a hash with the following keys:
   ListLinks
   ListChans
   MOTD
+  IRCD
   StartedAt
   ConnectedAt
   FinishedAt
