@@ -46,13 +46,18 @@ sub worker {
         
         POE::Kernel->run();
         
-        my $report = $trawler->report->netinfo() || {
-          NetName     => $server,
-          ServerName  => $server,
-          ConnectedTo => $server,
-          FinishedAt  => time,
-          Status => 'FAIL', 
-          Failed => 'report() retrieval failure in Process::Trawler',
+        my $report;
+        if ($trawler->failed) {
+          $report = {
+            NetName     => $server,
+            ServerName  => $server,
+            ConnectedTo => $server,
+            FinishedAt  => time,
+            Status => 'FAIL', 
+            Failure => $trawler->failed,
+          };
+        } else {
+          $report = $trawler->report->netinfo();
         };
         
         my $frozen = nfreeze([ $server, $report ]);
