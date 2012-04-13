@@ -400,9 +400,8 @@ sub irc_252 {
   my ($self) = $_[OBJECT];
   my $report = $self->report;
   my $rawline = $_[ARG1];
-  my $count = substr($rawline, 0, 1);
-  $count = 0 unless defined $count and $count =~ m/^\d+$/;
-  $report->opers($count);
+  my ($count) = $rawline =~ /^(\d+)/;
+  $report->opers($count||0);
 }
 
 sub irc_322 {
