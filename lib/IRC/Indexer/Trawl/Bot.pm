@@ -18,8 +18,6 @@ use IRC::Utils qw/
   strip_color strip_formatting
 /;
 
-## Methods
-
 sub new {
   my $class = shift;
   my $self = {};
@@ -46,6 +44,8 @@ sub new {
   $self->{POST} = delete $args{postback}
     if $args{postback} and ref $args{postback};
 
+  $self->{Serv} = IRC::Indexer::Report::Server->new;
+
   return $self
 }
 
@@ -63,7 +63,6 @@ sub spawn {
 sub run {
   my ($self) = @_;
 
-  $self->{Serv} = IRC::Indexer::Report::Server->new;
   $self->{Serv}->connectedto( $self->{ircserver} );
   
   my $sess = POE::Session->create(
@@ -142,9 +141,9 @@ sub failed {
     $self->report->failed($reason);
     $self->report->finishedat(time);
   } else {
-    return unless ref $self->report;
-    return "Unknown failure, no server()"
-      if $self->done and not $self->report->server;
+#    return "Unknown failure, no server()"
+#      if $self->done and not $self->report->server;
+
     return unless defined $self->report->status 
            and $self->report->status eq 'FAIL';
   }
@@ -163,7 +162,8 @@ sub done {
 
   return unless ref $self->report;  
   return unless defined $self->report->status
-         and $self->report->status ~~ [qw/DONE FAIL/];
+         and $self->report->status eq 'DONE'
+         or  $self->report->status eq 'FAIL';
   return $self->report->status
 }
 
@@ -172,7 +172,8 @@ sub dump {
   ## return() if we're not done:
   return unless ref $self->report;
   return unless defined $self->report->status 
-         and $self->report->status ~~ [qw/DONE FAIL/];
+         and $self->report->status eq 'DONE'
+         or  $self->report->status eq 'FAIL';
   ## else return hashref of net info (or failure status)
   ## that way masters can iterate through a pool of bots and check 'em
   ## frontends can serialize / store
@@ -183,7 +184,8 @@ sub _stop {}
 sub shutdown {
   my ($self, $kernel) = @_[OBJECT, KERNEL];
   
-  $kernel->alarm('b_check_timeout') if ref $kernel;
+  $kernel->alarm('b_check_timeout');
+  $kernel->alarm('b_issue_cmd');
 
   warn "-> Trawler shutdown called\n" if $self->verbose;
 
@@ -248,6 +250,9 @@ sub b_retrieve_info {
 
   warn "-> Retrieving server information\n" if $self->verbose;
 
+  $self->report->server( $self->irc->server_name )
+    unless $self->report->server;
+
   my $irc = $self->irc;  
   
   my $report = $self->report;
@@ -296,10 +301,13 @@ sub b_check_timeout {
     warn "-> have state: $state\n" if $self->verbose;
   }
   
-  $shutdown++ if $stc == scalar @states;
+  $shutdown = 1 if $stc == scalar @states;
 
   my $connectedat = $report->connectedat || 0;
-  $shutdown++ if time - $connectedat > $self->{timeout};
+  if (time - $connectedat > $self->{timeout}) {
+    $self->failed("Timed out");
+    ++$shutdown;
+  }
 
   if ($shutdown) {
     warn "-> Posting shutdown to own session\n" if $self->verbose;
@@ -323,6 +331,8 @@ sub irc_connected {
 sub irc_disconnected {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   ## we're done, clean up and report such 
+  $self->failed("irc_disconnected") unless $self->done;
+  $self->report->server($_[ARG0]) unless $self->report->server;
   $self->done(1);
 }
 
@@ -345,7 +355,7 @@ sub irc_001 {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   $self->report->status('CONNECTED');
   my $this_server = $self->irc->server_name;
-  $self->report->server( $this_server  );
+  $self->report->server($this_server) if $this_server;
   ## let things settle out, then b_retrieve_info:
   $kernel->alarm('b_retrieve_info', time + 3);
 }

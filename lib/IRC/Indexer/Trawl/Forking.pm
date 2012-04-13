@@ -1,6 +1,7 @@
 package IRC::Indexer::Trawl::Forking;
 
-## Object and session to handle a forked trawler.
+## Object and session to handle a single forked trawler.
+## This is mostly intended for ircindexer-server-json.
 
 ## Provide compatible methods w/ Bot::Trawl
 ## Other layers can use this with the same interface.
@@ -15,6 +16,8 @@ use Config;
 use POE qw/Wheel::Run Filter::Reference/;
 
 use Time::HiRes;
+
+use IRC::Indexer::Report::Server;
 
 require IRC::Indexer::Process::Trawler;
 
@@ -41,6 +44,9 @@ sub new {
   
   croak "No Server specified in new()"
     unless $self->{TrawlerOpts}->{server};
+
+  ## This should get replaced later:  
+  $self->{ReportObj} = IRC::Indexer::Report::Server->new();
   
   return $self
 }
@@ -114,8 +120,8 @@ sub failed {
     $self->report->finishedat(time);
   } else {
     return unless ref $self->report;
-    return "Unknown failure, no server()" 
-      if $self->done and not $self->report->server;
+#    return "Unknown failure, no server()" 
+#      if $self->done and not $self->report->server;
     return unless defined $self->report->status
       and $self->report->status eq 'FAIL';
   }
@@ -227,10 +233,12 @@ sub tr_input {
   $self->{ReportObj} = $report;
   ## We're finished.
   $self->done(1);
+  $self->failed( $info_h->{Failure} ) if $info_h->{Failure};
   delete $self->{wheels};
 }
 
 sub tr_error {
+  ## these should sigchld and go away
   my ($self, $kernel) = @_[OBJECT, KERNEL];
   my ($op, $num, $str, $wid) = @_[ARG0 .. $#_];
   my $wheel = $self->{wheels}->{by_wid}->{$wid};
@@ -244,7 +252,8 @@ sub tr_stderr {
   my ($err, $id) = @_[ARG0, ARG1];
   ## Report failed() and clean up
   warn "Worker err: $err";
-  $self->failed("Worker: $err");
+  $self->failed("Worker: SIGCHLD")
+    unless $self->done or $self->failed;
 }
 
 sub tr_sig_chld {
@@ -268,6 +277,8 @@ sub tr_closed {
   my $wheelid = $_[ARG0];
   my $wheel = delete $self->{wheels}->{by_wid}->{$wheelid};
   if (ref $wheel) {
+    $self->failed("Worker closed output")
+      unless $self->done or $self->failed;
     my $pidof = $wheel->PID;
     delete $self->{wheels}->{by_pid}->{$pidof};
     $wheel->kill(9);
@@ -287,8 +298,7 @@ IRC::Indexer::Trawl::Forking - Forking Trawl::Bot instances
 
 See L<IRC::Indexer::Trawl::Bot> for usage details.
 
-This carries the same interface, but trawlers are forked off rather than 
-run as asynchronous sessions.
+This carries the same interface, but a trawler is forked off.
 
 =head1 DESCRIPTION
 
