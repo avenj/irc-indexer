@@ -45,11 +45,22 @@ sub new {
   return $self
 }
 
+sub spawn {
+  ## POE-compat constructor
+  my ($pkg, %opts) = @_;
+  croak "cannot use spawn() interface without a postback"
+    unless $opts{postback};
+  my $self = $pkg->new(%opts);
+  my $sess = $self->run();
+  my $sid  = $sess->ID;
+  return $sid
+}
+
 sub run {
   my ($self) = @_;
   ## Create POE session to manage forked Bot::Trawl
   
-  POE::Session->create(
+  return POE::Session->create(
     object_states => [
       $self => [ qw/
         _start
@@ -76,6 +87,12 @@ sub done {
   if ($finished) {
     $self->report->status('DONE');
     $self->report->finishedat(time);
+
+    if (my $postback = delete $self->{POST}) {
+      ## Send ourself in a postback.
+      $postback->($self);
+    }
+
   }
   
   return unless ref $self->report;
@@ -211,14 +228,11 @@ sub tr_input {
   ## We're finished.
   $self->done(1);
   delete $self->{wheels};
-  if (my $postback = delete $self->{POST}) {
-    ## Send ourself in a postback.
-    $postback->($self);
-  }
 }
 
 sub tr_error {
-
+  my ($op, $num, $str, $wid) = @_[ARG0 .. $#_];
+  warn "$wid err: $op $num $str";
 }
 
 sub tr_stderr {
