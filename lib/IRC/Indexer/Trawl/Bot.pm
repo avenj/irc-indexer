@@ -43,10 +43,22 @@ sub new {
   $self->{bindaddr} = $args{bindaddr} if $args{bindaddr};
   $self->{useipv6}  = $args{ipv6} || 0;
 
+  $self->{POST} = delete $args{postback}
+    if $args{postback} and ref $args{postback};
+
   return $self
 }
 
 sub trawler_for { return $_[0]->{ircserver} }
+
+sub spawn {
+  my ($pkg, %opts) = @_;
+  croak "cannot use spawn() interface without a postback"
+    unless $opts{postback};
+  my $self = $pkg->new(%opts);
+  my $sess = $self->run();
+  return $self->{sessid}
+}
 
 sub run {
   my ($self) = @_;
@@ -54,7 +66,7 @@ sub run {
   $self->{Serv} = IRC::Indexer::Report::Server->new;
   $self->{Serv}->connectedto( $self->{ircserver} );
   
-  POE::Session->create(
+  my $sess = POE::Session->create(
     object_states => [
       $self => [
       
@@ -92,8 +104,12 @@ sub run {
          'irc_323',
     ] ],
   );
+  
+  $self->{sessid} = $sess->ID;
 
   $self->{Serv}->startedat( time() );
+  
+  return $sess
 }
 
 sub verbose {
@@ -108,8 +124,8 @@ sub irc {
   return $self->{ircobj}
 }
 
-sub report { info(@_) }
-sub info {
+sub info { report(@_) }
+sub report {
   my ($self) = @_;
   return $self->{Serv}
 }
@@ -118,49 +134,49 @@ sub info {
 
 sub failed {
   my ($self, $reason) = @_;
-  return unless ref $self->info;
+  return unless ref $self->report;
   
   if ($reason) {
     carp "Trawl run failed: $reason" if $self->verbose;
-    $self->info->status('FAIL');
-    $self->info->failed($reason);
-    $self->info->finishedat(time);
+    $self->report->status('FAIL');
+    $self->report->failed($reason);
+    $self->report->finishedat(time);
   } else {
-    return unless ref $self->info;
+    return unless ref $self->report;
     return "Unknown failure, no server()"
-      if $self->done and not $self->info->server;
-    return unless defined $self->info->status 
-           and $self->info->status eq 'FAIL';
+      if $self->done and not $self->report->server;
+    return unless defined $self->report->status 
+           and $self->report->status eq 'FAIL';
   }
-  return $self->info->failed
+  return $self->report->failed
 }
 
 sub done {
   my ($self, $finished) = @_;
   
   if ($finished) {
-    carp "Trawler completed: ".$self->info->connectedto
+    carp "Trawler completed: ".$self->report->connectedto
       if $self->verbose;
-    $self->info->status('DONE');
-    $self->info->finishedat(time());
+    $self->report->status('DONE');
+    $self->report->finishedat(time());
   }
 
-  return unless ref $self->info;  
-  return unless defined $self->info->status
-         and $self->info->status ~~ [qw/DONE FAIL/];
-  return $self->info->status
+  return unless ref $self->report;  
+  return unless defined $self->report->status
+         and $self->report->status ~~ [qw/DONE FAIL/];
+  return $self->report->status
 }
 
 sub dump {
   my ($self) = @_;
   ## return() if we're not done:
-  return unless ref $self->info;
-  return unless defined $self->info->status 
-         and $self->info->status ~~ [qw/DONE FAIL/];
+  return unless ref $self->report;
+  return unless defined $self->report->status 
+         and $self->report->status ~~ [qw/DONE FAIL/];
   ## else return hashref of net info (or failure status)
   ## that way masters can iterate through a pool of bots and check 'em
   ## frontends can serialize / store
-  return $self->info->netinfo
+  return $self->report->netinfo
 }
 
 sub _stop {}
@@ -169,13 +185,15 @@ sub shutdown {
   
   $kernel->alarm('b_check_timeout') if ref $kernel;
 
-  ## FIXME postback for finished trawlers?
-  
   warn "-> Trawler shutdown called\n" if $self->verbose;
 
-  $self->done(1);  
-  $self->irc->call('shutdown')   if ref $self->irc;
+  $self->done(1) unless $self->done;  
+  $self->irc->yield('shutdown')   if ref $self->irc;
   $self->irc(1);
+  
+  if (my $postback = delete $self->{POST}) {
+    $postback->($self);
+  }
 }
 
 sub _start {
@@ -216,13 +234,12 @@ sub b_retrieve_info {
 
   my $irc = $self->irc;  
   
-  my $info = $self->info;
-  $info->server( $irc->server_name )
-    unless $info->server;
+  my $report = $self->report;
   
   my $network = $irc->isupport('NETWORK') || $irc->server_name;
-  $info->netname($network);
-  
+  $report->netname($network);
+
+  $report->ircd( $irc->server_version // 'Not Available' );  
   ## yield off commands to grab anything else needed:
   ##  - LUSERS (maybe, unless we have counts already)
   ##  - LINKS
@@ -238,6 +255,9 @@ sub b_retrieve_info {
 sub b_issue_cmd {
   my ($self, $cmd) = @_[OBJECT, ARG0];
   
+  $self->report->server( $self->irc->server_name )
+    unless $self->report->server;
+
   ## most servers will announce lusers at connect-time:
   return if $cmd eq 'lusers' and $self->{State}->{Lusers};
   
@@ -248,7 +268,7 @@ sub b_issue_cmd {
 sub b_check_timeout {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   my $irc = $self->irc;
-  my $info = $self->info;
+  my $report = $self->report;
   
   my $shutdown = 0;
   
@@ -262,7 +282,7 @@ sub b_check_timeout {
   
   $shutdown++ if $stc == scalar @states;
 
-  my $connectedat = $info->connectedat || 0;
+  my $connectedat = $report->connectedat || 0;
   $shutdown++ if time - $connectedat > $self->{timeout};
 
   if ($shutdown) {
@@ -279,9 +299,9 @@ sub b_check_timeout {
 sub irc_connected {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
   ## report connected status; irc_001 handles the rest
-  my $info = $self->info;
-  $info->status('INIT');
-  $info->connectedat(time());
+  my $report = $self->report;
+  $report->status('INIT');
+  $report->connectedat(time());
 }
 
 sub irc_disconnected {
@@ -307,9 +327,9 @@ sub irc_error {
 
 sub irc_001 {
   my ($self, $kernel, $heap) = @_[OBJECT, KERNEL, HEAP];
-  $self->info->status('CONNECTED');
+  $self->report->status('CONNECTED');
   my $this_server = $self->irc->server_name;
-  $self->info->server( $this_server );
+  $self->report->server( $this_server  );
   ## let things settle out, then b_retrieve_info:
   $kernel->alarm('b_retrieve_info', time + 3);
 }
@@ -317,23 +337,23 @@ sub irc_001 {
 sub irc_375 {
   ## Start of MOTD
   my ($self, $server) = @_[OBJECT, ARG0];
-  my $info = $self->info;
-  $info->blank_motd;
-  $info->motd( "MOTD for $server:" );
+  my $report = $self->report;
+  $report->blank_motd;
+  $report->motd( "MOTD for $server:" );
 }
 
 sub irc_372 {
   ## MOTD line
   my ($self) = $_[OBJECT];
-  my $info = $self->info;
-  $info->motd( $_[ARG1] );
+  my $report = $self->report;
+  $report->motd( $_[ARG1] );
 }
 
 sub irc_376 {
   ## End of MOTD
   my ($self) = $_[OBJECT];
-  my $info = $self->info;
-  $info->motd( "End of MOTD." );  
+  my $report = $self->report;
+  $report->motd( "End of MOTD." );  
   $self->{State}->{MOTD} = 1;
 }
 
@@ -349,13 +369,13 @@ sub irc_364 {
 sub irc_365 {
   ## end of LINKS
   my $self = $_[OBJECT];
-  $self->info->links( $self->{ListLinks} );
+  $self->report->links( $self->{ListLinks} );
   $self->{State}->{Links} = 1;
 }
 
 sub irc_251 {
   my ($self) = $_[OBJECT];
-  my $info = $self->info;
+  my $report = $self->report;
   $self->{State}->{Lusers} = 1;
     
   my $rawline;
@@ -372,23 +392,23 @@ sub irc_251 {
       last if ++$i == 2;
     }
   }
-  $info->users($users||0)
+  $report->users($users||0)
 }
 
 sub irc_252 {
   ## LUSERS oper count
   my ($self) = $_[OBJECT];
-  my $info = $self->info;
+  my $report = $self->report;
   my $rawline = $_[ARG1];
   my $count = substr($rawline, 0, 1);
   $count = 0 unless defined $count and $count =~ m/^\d+$/;
-  $info->opers($count);
+  $report->opers($count);
 }
 
 sub irc_322 {
   ## LIST
   my ($self) = $_[OBJECT];
-  my $info = $self->info;
+  my $report = $self->report;
   my $split = $_[ARG2] // return;
   my ($chan, $users, $topic) = @$split;
   
@@ -401,7 +421,7 @@ sub irc_322 {
   $topic //= ''; 
   
   ## Add a hash element
-  $info->add_channel($chan, $users, $topic);
+  $report->add_channel($chan, $users, $topic);
 }
 
 sub irc_323 {
@@ -444,15 +464,15 @@ IRC::Indexer::Trawl::Bot - Indexing trawler instance
     Interval => 5,
     
     ## Verbosity/debugging level:
-    Verbose => 0,
+    Verbose => 0,    
   );
 
   $trawl->run;
   
   ## Later:
   if ( $trawl->done ) {
-    my $info = $trawl->info;
-    my $hash = $info->netinfo;
+    my $report = $trawl->report;
+    my $hash = $report->netinfo;
     . . .
   }
   

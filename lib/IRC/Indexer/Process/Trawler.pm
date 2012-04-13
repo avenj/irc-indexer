@@ -15,6 +15,7 @@ use bytes;
 
 sub worker {
   $0 = "ircindexer TRAWL" unless $^O eq 'MSWin32';
+  ## In case we're running as a forked coderef:
   POE::Kernel->stop;
 
   binmode STDOUT;

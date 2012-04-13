@@ -44,6 +44,7 @@ I<null>.
   ConnectedTo
   ServerName
   NetName
+  IRCD
   MOTD
   GlobalUsers
   OperCount
@@ -79,6 +80,7 @@ In Perl, you can use these to create a DateTime object, for example:
   GlobalUsers => INT total number of global users
   OperCount   => INT total number of global operators
                  (optional, undef if not announced in LUSERS)
+  IRCD        => STRING IRCD version if available
 
 =head2 MOTD
 
