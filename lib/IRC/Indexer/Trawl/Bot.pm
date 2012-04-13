@@ -303,8 +303,8 @@ sub b_check_timeout {
   
   $shutdown = 1 if $stc == scalar @states;
 
-  my $connectedat = $report->connectedat || 0;
-  if (time - $connectedat > $self->{timeout}) {
+  my $startedat = $report->startedat || 0;
+  if (time - $startedat > $self->{timeout}) {
     $self->failed("Timed out");
     ++$shutdown;
   }
