@@ -199,11 +199,7 @@ sub tr_input {
 
   my ($server, $info_h) = @$input;
   unless (ref $info_h eq 'HASH') {
-    warn "tr_input received invalid input from worker";
-    $info_h = {
-      Status => 'FAIL',
-      Failed => "Invalid input from worker",
-    };
+    croak "tr_input received invalid input from worker";
   }
 
   ## Re-create Report::Server obj
@@ -229,6 +225,7 @@ sub tr_stderr {
   my ($self, $kernel) = @_[OBJECT, KERNEL];
   my ($err, $id) = @_[ARG0, ARG1];
   ## Report failed() and clean up
+  warn "Worker err: $err";
   $self->failed("Worker: $err");
 }
 

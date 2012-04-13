@@ -15,7 +15,7 @@ use bytes;
 
 sub worker {
   $0 = "ircindexer TRAWL" unless $^O eq 'MSWin32';
-#  POE::Kernel->stop;
+  POE::Kernel->stop;
 
   binmode STDOUT;
   binmode STDIN;
@@ -44,8 +44,6 @@ sub worker {
         $trawler->run();
         
         POE::Kernel->run();
-        
-        die $trawler->failed if $trawler->failed;
         
         my $report = $trawler->report->netinfo() || {
           NetName     => $server,

@@ -217,6 +217,8 @@ sub b_retrieve_info {
   my $irc = $self->irc;  
   
   my $info = $self->info;
+  $info->server( $irc->server_name )
+    unless $info->server;
   
   my $network = $irc->isupport('NETWORK') || $irc->server_name;
   $info->netname($network);
@@ -309,7 +311,7 @@ sub irc_001 {
   my $this_server = $self->irc->server_name;
   $self->info->server( $this_server );
   ## let things settle out, then b_retrieve_info:
-  $kernel->alarm('b_retrieve_info', time + 2);
+  $kernel->alarm('b_retrieve_info', time + 3);
 }
 
 sub irc_375 {
