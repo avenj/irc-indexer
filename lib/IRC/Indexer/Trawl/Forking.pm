@@ -231,8 +231,12 @@ sub tr_input {
 }
 
 sub tr_error {
+  my ($self, $kernel) = @_[OBJECT, KERNEL];
   my ($op, $num, $str, $wid) = @_[ARG0 .. $#_];
-  warn "$wid err: $op $num $str";
+  my $wheel = $self->{wheels}->{by_wid}->{$wid};
+  my $pidof = $wheel->PID if ref $wheel;
+  warn "worker err, probably harmless: $self->trawler_for $wid err: $op"
+    ." $num $str\n";
 }
 
 sub tr_stderr {

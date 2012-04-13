@@ -100,22 +100,18 @@ GetOptions( $opts,
   /,
 );
 
-## These are set up here for ease of reference:
-
 my $obj = {
   Log    => undef,
   Cfg    => undef,
-
-  active_trawlers => {},
-  
+  active_trawlers => {},  
   workers_by_pid => {},
   workers_by_wid => {},
 };
 
-my $state = { 
-
+my $state = {
   timers => { trawlers => {} },
   stats  => {
+    ## Basic outline; guaranteed present in /stats output.
     RunID => sha1_hex(Time::HiRes::time() . rand),
     Version => $IRC::Indexer::VERSION,
     StartedAt => time,
@@ -137,6 +133,7 @@ my $state = {
 };
 
 my $cfg = { 
+  ## Defaults.
   Networks => {},
   BindAddr   => '0.0.0.0',
   ServerPort => 8700,
@@ -497,6 +494,7 @@ sub e_trawler_run {
   ## Too many trawlers running.
   my $current_count = keys %{$obj->{active_trawlers}};
   if ($cfg->{MaxTrawlers} && $current_count >= $cfg->{MaxTrawlers}) {
+    ++$state->{stats}->{ThrottledTrawler};
     $kernel->alarm_add( 'e_trawler_run', time + 1, $confitem );
     return
   }
@@ -665,10 +663,13 @@ sub db_open {
   }
 
   $state->{openDB}->{$network} = \%this_cache;
+  ++$state->{stats}->{DB}->{Open};
 }
 
 sub db_write {
   my ($data, $network, $server) = @_;
+
+  ++$state->{stats}->{DB}->{Write};
   
   my $opendb = $state->{openDB}->{$network};
   
@@ -687,6 +688,8 @@ sub db_write {
 sub db_read {
   my ($network, $server) = @_;
 
+  ++$state->{stats}->{DB}->{Read};
+
   my $opendb = $state->{openDB}->{$network};
 
   unless ($opendb && tied %$opendb) {
@@ -702,21 +705,10 @@ sub db_read {
   return $data
 }
 
-sub db_del_server {
-  my ($network, $server) = @_;
-  return unless $server;
-
-  my $opendb = $state->{openDB}->{$network};
-  
-  unless ($opendb && tied %$opendb) {
-    die "Attempted db_del_server on unopened DB ($network)"
-  }
-  
-  return delete $opendb->{$server}
-}
-
 sub db_close {
   my ($network) = @_;
+
+  ++$state->{stats}->{DB}->{Close};
   
   my $cachedir;
   die "db_close called but no CacheDir configured"
@@ -1081,6 +1073,7 @@ sub js_push_pending {
   ## yield back if too many workers running
   my $current_workers = scalar keys %{ $obj->{workers_by_pid}//{} };
   if ($cfg->{MaxEncoders} && $cfg->{MaxEncoders} <= $current_workers) {
+    ++$state->{stats}->{ThrottledEncoder};
     $kernel->alarm_add('js_push_pending', Time::HiRes::time + 0.5, $item);
     return
   }
@@ -1118,6 +1111,8 @@ sub js_push_pending {
     CloseEvent  => 'js_worker_closed',
     StdioFilter => POE::Filter::Reference->new(),
   );
+
+  ++$state->{stats}->{Wheels}->{Created};
   
   my $wheelid = $wheel->ID;
   my $pidof   = $wheel->PID;
@@ -1141,6 +1136,8 @@ sub js_worker_stdout {
     log_to('session', 'warn', "Invalid input from encoder!");
     return
   }
+  
+  ++$state->{stats}->{Wheels}->{Success};
 
   ## got JSON back, cache_json it
   cache_json($zip, $network, $server);
@@ -1152,6 +1149,8 @@ sub js_worker_stdout {
 sub js_worker_stderr {
   my ($kernel, $err, $id) = @_[KERNEL, ARG0, ARG1];
   log_to('session', 'warn', "Encoder reported err: $err");
+  
+  ++$state->{stats}->{Wheels}->{Died};
   ## these will die() and go away.
 }
 
@@ -1160,6 +1159,8 @@ sub js_worker_closed {
   
   ## If the worker closes STDOUT early, something is wrong.
   ## Clean up.
+  
+  ++$state->{stats}->{Wheels}->{Closed};
 
   my $wheel = delete $obj->{workers_by_wid}->{$wheelid};
   
@@ -1173,6 +1174,7 @@ sub js_worker_closed {
 sub js_worker_error {
   ## null-op; these should sigchld and go away
   ## (and you get no data either way)
+  ++$state->{stats}->{Wheels}->{ErrEvent};
 }
 
 sub js_worker_sigchld {
@@ -1180,6 +1182,8 @@ sub js_worker_sigchld {
   my ($kernel, $pidof) = @_[KERNEL, ARG1];
   
   log_to('session', 'debug', "Worker sig_chld: $pidof");
+
+  ++$state->{stats}->{Wheels}->{SIGCHLD};
 
   my $wheel;
   return unless $wheel = delete $obj->{workers_by_pid}->{$pidof};
