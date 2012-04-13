@@ -64,6 +64,7 @@ requires:
   Digest::SHA: 0
   File::Find: 0
   File::Path: 0
+  File::Spec: 0
   Getopt::Long: 0
   IRC::Utils: 0
   JSON::XS: 0

@@ -15,6 +15,7 @@ use Fcntl qw/:DEFAULT :flock/;
 use Digest::SHA  qw/sha1_hex/;
 use File::Path   qw/make_path remove_tree/;
 use Scalar::Util qw/blessed/;
+use Storable     qw/dclone/;
 use POSIX ();
 use Time::HiRes;
 require bytes;
@@ -567,16 +568,16 @@ sub e_trawler_process {
     my $n_info = $netinfo_obj->netinfo;
     undef $netinfo_obj;
 
-    ## preserve it for later Network reconstruction
-    $obj->{NetInfo}->{$network} = $n_info;
+    ## preserve hash for later Network reconstruction, w/out chans:
+    $obj->{NetInfo}->{$network} = dclone($n_info);
 
+    ## cheat a bit, merge this run's hashchans:
     $n_info->{HashChans} = $s_info->{HashChans};
     
     $kernel->call( $_[SESSION], 'js_push_pending',
       [ $n_info, $network ]
     );
-    
-    undef $n_info;
+    undef $n_info;    
     
     $kernel->call( $_[SESSION], 'js_push_pending',
       [ $s_info, $network, $server ],
@@ -959,7 +960,10 @@ sub h_netlist {
 
   ## Return JSONified array of pullable networks:
 
-  my $netlist = [ keys %$ArrayConf ];
+  my $netlist = {
+    Configured => [ keys %$ArrayConf ],
+    Trawled    => [ keys ${$state->{stats}->{Success}} ],
+  };
 
   my $jsify = IRC::Indexer::Output::JSON->new(
     Input => $netlist,
