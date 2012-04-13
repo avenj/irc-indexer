@@ -30,7 +30,7 @@ sub new {
 
   $self->verbose($args{verbose} || 0);
 
-  $self->{timeout}   = $args{timeout}  || 120;
+  $self->{timeout}   = $args{timeout}  || 90;
   $self->{interval}  = $args{interval} || 5;
 
   $self->{ircserver} = $args{server} 
@@ -483,7 +483,7 @@ IRC::Indexer::Trawl::Bot - Indexing trawler instance
     UseIPV6 => 1,
     
     ## Overall timeout for this server:
-    Timeout => 120,
+    Timeout => 90,
     
     ## Interval between commands (LIST/LINKS/LUSERS):
     Interval => 5,
@@ -535,7 +535,7 @@ the backbone of the rest of the IRC::Indexer modules and utilities.
 
 Connects to a specified server, gathers some network information, and 
 disconnects when either all requests appear to be fulfilled or the 
-specified timeout (defaults to 120 seconds) is reached.
+specified timeout (defaults to 90 seconds) is reached.
 
 When the trawler is finished, $trawl->done() will be boolean true; if 
 there was some error, $trawl->failed() will be true and will contain a 
