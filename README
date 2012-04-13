@@ -19,6 +19,9 @@ SYNOPSIS
       ## Spawn a httpd serving JSON:
       $ ircindexer-server-json -c httpd.cf
 
+      ## See IRC::Indexer::Trawl::Bot for more on using trawlers from 
+      ## within your own POE-enabled apps.
+
 DESCRIPTION
     A set of modules and utilities useful for trawling IRC networks,
     collecting information, and exporting it to portable formats for use in
@@ -44,9 +47,6 @@ DESCRIPTION
     details on exported data.
 
 TODO
-    The postback interface for session notification is incomplete and
-    untested as of 0.1.
-
     Tests are currently terrible.
 
 BUGS
