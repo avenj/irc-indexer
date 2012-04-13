@@ -1,5 +1,7 @@
 #!perl
 
+## Example single-server trawler using postback.
+
 use 5.12.1;
 use strict;
 use warnings;
@@ -59,64 +61,64 @@ die "Missing --server\n" unless $server;
 
 warn "Connecting to: $server\n";
 
-my $trawl = IRC::Indexer::Trawl::Bot->new(
-  server => $server,
-  port   => $port,
-  verbose  => $verbose,
-  timeout  => $timeout,
-  interval => $interval,
-);
-
 POE::Session->create(
   inline_states => {
-    _start => sub {
-      $trawl->run;
-      $_[KERNEL]->alarm('check', time + 20);
+    '_start' => sub {
+      IRC::Indexer::Trawl::Bot->spawn(
+        postback => $_[SESSION]->postback('trawler_done'),
+        server => $server,
+        port   => $port,
+        verbose  => $verbose,
+        timeout  => $timeout,
+        interval => $interval,
+      );
     },
     
-    check => sub {
-      if ($trawl->done) {
-        my $info = $trawl->info;
-        $info->channels; ## builds sorted chan list
-        my $ref = $trawl->dump;
-        warn "Done\n";
-
-        my $output;
-        given ($fmt) {
-          when ("JSON") {
-            $output = IRC::Indexer::Output::JSON->new(
-              Input => $ref,
-            );
-          }
-          
-          when ("YAML") {
-            $output = IRC::Indexer::Output::YAML->new(
-              Input => $ref,
-            );
-          }
-          
-          default {
-            $output = IRC::Indexer::Output::Dumper->new(
-              Input => $ref,
-            );
-          }
-        }
-        
-        if ($outpath) {
-          warn "Writing: $outpath\n";
-          $output->write($outpath);
-        } else {
-          print $output->dump;
-        }
-        
-        $_[KERNEL]->stop;
-        exit 0
-      } else {
-        warn "Waiting . . .\n";
-        $_[KERNEL]->alarm('check', time + 20);
+    trawler_done => sub {
+      ## Should have gotten the trawler obj.
+      ## ARG1 will be an arrayref.
+      my $trawl = $_[ARG1]->[0];
+      if ($trawl->failed) {
+        die "Trawler failed: ".$trawl->failed
       }
+    
+      my $info = $trawl->info;
+      $info->channels; ## builds sorted chan list
+      my $ref = $trawl->dump;
+      undef $trawl;
+      warn "Done\n";
+
+      my $output;
+      given ($fmt) {
+        when ("JSON") {
+          $output = IRC::Indexer::Output::JSON->new(
+            Input => $ref,
+          );
+        }
+        
+        when ("YAML") {
+          $output = IRC::Indexer::Output::YAML->new(
+            Input => $ref,
+          );
+        }
+        
+        default {
+          $output = IRC::Indexer::Output::Dumper->new(
+            Input => $ref,
+          );
+        }
+      }
+      
+      if ($outpath) {
+        warn "Writing: $outpath\n";
+        $output->write($outpath);
+      } else {
+        print $output->dump;
+      }
+
     },
-  },
+    
+  }, ## inline_states
 );
 
 POE::Kernel->run;
