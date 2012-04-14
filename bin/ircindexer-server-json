@@ -442,6 +442,7 @@ sub e_rehash {
 }
 
 sub session_sig_hup {
+  log_to('session', 'warn', 'SIGHUP, reloading');
   $_[KERNEL]->sig_handled();
   $_[KERNEL]->call( $_[SESSION], 'e_rehash');
 }
@@ -538,6 +539,15 @@ sub e_trawler_run {
   ## takes an arrayref:
   ##  [ network, server, conf-as-hashref ]
   my ($kernel, $heap, $confitem) = @_[KERNEL, HEAP, ARG0];
+
+  unless (ref $confitem eq 'ARRAY' && $ArrayConf->{ $confitem->[0] }) {
+    ## e_trawler_run was scheduled, but we lost the network in a rehash.
+    ## this is a hack; we should be tracking/removing alarm_add IDs.
+    log_to('irc', 'debug', 
+      "skipped e_trawler_run for cancelled trawler"
+    );
+    return
+  }
 
   my ($network, $server, $trawlcf) = @$confitem;
 
