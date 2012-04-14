@@ -43,7 +43,9 @@ Web frontends and other applications.
 L<ircindexer-server-json> serves as an example of how to use the trawler 
 system to index IRC networks; it is usable as-is to trawl sets of IRC 
 servers belonging to configured networks and serve JSON-serialized 
-network stats via HTTP.
+network stats via HTTP. This could be used directly to build an IRC 
+trawling/indexing Web application in a language of your choice, for 
+example.
 
 L<ircindexer-single> can be used to trawl a single server in one shot, 
 exporting to YAML, JSON, or Perl.

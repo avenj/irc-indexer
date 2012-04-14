@@ -211,7 +211,11 @@ Forking: 0
 ## a lot of networks, you may want to throttle these to avoid
 ## resource starvation.
 ##
-## Defaults to 20; 0 or empty string '' disables.
+## It's perfectly safe to set to '1' -- the only downside is 
+## increasing the odds of keeping more networks in memory 
+## longer before they can be shuffled off to an encoder.
+##
+## Defaults to 20.
 #MaxEncoders: 10
 
 ## ListChans:
