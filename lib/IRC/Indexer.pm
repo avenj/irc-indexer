@@ -67,6 +67,10 @@ L<IRC::Indexer::POD::NetworkSpec> for details on exported data.
 =over
 
 =item *
+Nothing very useful is done with LINKS data; it's not always available 
+and is presented as-is. We should maybe export a hash.
+
+=item *
 More useful examples in examples/
 
 =item *

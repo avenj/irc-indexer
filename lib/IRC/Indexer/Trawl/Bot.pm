@@ -391,7 +391,7 @@ sub irc_376 {
 
 sub irc_364 {
   ## LINKS, if we can get it
-  ## FIXME -- also grab ARG2 and try to create useful hash
+  ## FIXME -- also grab ARG2 and try to create useful hash?
   my ($self) = $_[OBJECT];
   my $rawline;
   return unless $rawline = $_[ARG1];
