@@ -17,7 +17,7 @@ use File::Path   qw/make_path remove_tree/;
 use Scalar::Util qw/blessed/;
 use Storable     qw/dclone/;
 use POSIX ();
-use Time::HiRes;
+use Time::HiRes  qw/tv_interval gettimeofday/;
 require bytes;
 
 ## POE + HTTP
@@ -41,8 +41,7 @@ use IRC::Indexer::Report::Network;
 
 use IRC::Indexer::Output::JSON;
 
-use Compress::Zlib qw/memGzip memGunzip $gzerrno gzopen/;
-use JSON::XS;
+use Compress::Zlib qw/memGzip memGunzip/;
 
 my $opts = {
   help => sub {
@@ -652,7 +651,7 @@ sub db_open {
   my $runid = $state->{stats}->{RunID};
   if ($this_cache{'_RUNID'} && $this_cache{'_RUNID'} ne $runid) {
     log_to('DB', 'warn', "Clearing stale DB: $network");
-    delete $this_cache{$_} for keys %this_cache;
+    %this_cache = ();
   }
   $this_cache{'_RUNID'} = $runid;
 
@@ -741,9 +740,23 @@ sub cachedir_write {
   die "cachedir_write called but no CacheDir configured"
     unless $cachedir = $cfg->{CacheDir};
 
+  my $timer0 = [gettimeofday];
+  
   db_open($network, Raw => 1);
   db_write($zipped, $network, $server);
   db_close($network);
+  
+  my $interval = tv_interval($timer0);
+
+  $state->{stats}->{DB}->{'WR_Total'}  += (sprintf("%.6f", $interval)+0);
+  $state->{stats}->{DB}->{'WR_Longest'} = $interval
+    if $interval > ($state->{stats}->{DB}->{'WR_Longest'}//0);
+
+  my $runs = $state->{stats}->{DB}->{Write} // 1;
+  my $avg  = $state->{stats}->{DB}->{'WR_Total'} / $runs;
+  
+  $state->{stats}->{DB}->{'WR_Avg'} = sprintf("%.6f", $avg) + 0;
+  
   return 1 
 }
 
@@ -756,9 +769,23 @@ sub cachedir_read {
   die "cachedir_read called but no CacheDir configured"
     unless $cachedir = $cfg->{CacheDir};
 
+  my $timer0 = [gettimeofday];
+  
   db_open($network, Raw => $gzipped);
   my $data = db_read($network, $server);
   db_close($network);
+  
+  my $interval = tv_interval($timer0);
+
+  $state->{stats}->{DB}->{'RD_Total'}  += (sprintf("%.6f", $interval)+0);
+  $state->{stats}->{DB}->{'RD_Longest'} = $interval
+    if $interval > ($state->{stats}->{DB}->{'RD_Longest'}//0);
+
+  my $read = $state->{stats}->{DB}->{Read} // 1;
+  my $avg  = $state->{stats}->{DB}->{'RD_Total'} / $read;
+  
+  $state->{stats}->{DB}->{'RD_Avg'} = sprintf("%.6f", $avg) + 0;
+  
   return $data
 }
 
@@ -962,7 +989,7 @@ sub h_netlist {
 
   my $netlist = {
     Configured => [ keys %$ArrayConf ],
-    Trawled    => [ keys ${$state->{stats}->{Success}} ],
+    Trawled    => [ keys %{$state->{stats}->{Success}} ],
   };
 
   my $jsify = IRC::Indexer::Output::JSON->new(
