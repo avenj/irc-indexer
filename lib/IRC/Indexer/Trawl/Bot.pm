@@ -56,7 +56,7 @@ sub spawn {
   croak "cannot use spawn() interface without a postback"
     unless $opts{postback};
   my $self = $pkg->new(%opts);
-  my $sess = $self->run();
+  $self->run();
   return $self->{sessid}
 }
 
@@ -108,7 +108,7 @@ sub run {
 
   $self->{Serv}->startedat( time() );
   
-  return $sess
+  return $self
 }
 
 sub verbose {
@@ -178,6 +178,12 @@ sub dump {
   ## that way masters can iterate through a pool of bots and check 'em
   ## frontends can serialize / store
   return $self->report->netinfo
+}
+
+sub ID {
+  ## Get our POE SessionID if running.
+  my ($self) = @_;
+  return $self->{sessid}
 }
 
 sub _stop {}
@@ -464,9 +470,9 @@ IRC::Indexer::Trawl::Bot - Indexing trawler instance
 
 =head1 SYNOPSIS
 
-  ## Inside a POE session:
-  
-  my $trawl = IRC::Indexer::Trawl::Bot->spawn(
+  ## Inside a POE session
+  ## 'spawn' returns session ID:  
+  my $trawl_sess_id = IRC::Indexer::Trawl::Bot->spawn(
     ## Server address and port:
     Server  => 'irc.cobaltirc.org',
     Port    => 6667,
@@ -505,7 +511,8 @@ IRC::Indexer::Trawl::Bot - Indexing trawler instance
 
   ## Or without postbacks:
   
-  ## Spawn a bunch of trawlers in a loop:
+  ## Spawn a bunch of trawlers in a loop
+  ## new() and run() both return a trawler object
   my $trawlers;
   for my $server (@servers) {
     $trawlers->{$server} = IRC::Indexer::Trawl::Bot->new(
@@ -548,6 +555,7 @@ If a postback was specified at construction time, the event will be
 posted when a trawler has finished. $_[ARG1]->[0] will contain the 
 trawler object; $_[ARG0] will be an array reference containing any 
 arguments specified in your 'Postback =>' option after the event name.
+See L</spawn> if you'd like to use the POE interface.
 
 The B<report()> method returns the L<IRC::Indexer::Report::Server> 
 object.
@@ -564,9 +572,9 @@ specifying a different B<interval> at construction.
 See L<IRC::Indexer::Trawl::Forking> for an interface-compatible forked
 trawler instance.
 
-=head2 METHODS
+=head1 METHODS
 
-=head3 new
+=head2 new
 
 Construct, but do not L</run>, a trawler instance.
 
@@ -578,26 +586,43 @@ initialized (but you lose the ability to use postbacks).
 
 See L</SYNOPSIS> for constructor options.
 
-=head3 spawn
+=head2 spawn
 
 Construct and immediately run a trawler from within a running 
 L<POE::Session>.
 
+Returns a POE session ID that can be used to post L</shutdown> events if 
+needed. 
+
 See L</SYNOPSIS> for constructor options.
 
-=head3 trawler_for
+=head2 run
 
-Returns the server this trawler was constructed for.
+Start the trawler session. Returns the trawler object, so you can chain 
+methods thusly:
 
-=head3 run
-
-Start the trawler session.
+  my $trawler = IRC::Indexer::Trawl::Bot->new(%opts)->run();
 
 You should only call run() if you're not using the spawn() interface.
 
 spawn() will call run() for you.
 
-=head3 failed
+=head2 trawler_for
+
+Returns the server this trawler was constructed for.
+
+=head2 ID
+
+Returns the POE::Session ID of the trawler, if it is running.
+
+Can be used to post a L</shutdown>, if needed:
+
+  $poe_kernel->post( $trawler->ID, 'shutdown' );
+
+Returns undef if the trawler was constructed via B<new()> but was never 
+B<run()>.
+
+=head2 failed
 
 If a trawler has encountered an error, B<failed> will return true and 
 contain a string describing the problem.
@@ -605,22 +630,35 @@ contain a string describing the problem.
 It's safest to skip failed runs when processing output; if a report 
 object does exist, the reported data is probably incomplete or broken.
 
-=head3 done
+=head2 done
 
 Returns boolean true if the trawler instance has finished; it may still 
 be L</failed> and have an incomplete or nonexistant report.
 
-=head3 report
+=head2 report
 
 Returns the L<IRC::Indexer::Report::Server> object, from which server 
 information can be retrieved.
 
 Nonexistant until the trawler has been ->run().
 
-=head3 dump
+=head2 dump
 
 Returns the L</report> hash if the trawler instance has finished, or 
 undef if not. See L<IRC::Indexer::Report::Server>
+
+=head1 Shutting down
+
+The trawler instance will run its own cleanup when the run has 
+completed, but sometimes you may need to shut it down early.
+
+The safest way to shut down your trawler is to post a B<shutdown> event:
+
+  my $sess_id = $trawler->ID();
+  if ($sess_id) {
+    ## Or call(), if you really must ...
+    $poe_kernel->post( $sess_id, 'shutdown' );
+  }
 
 =head1 AUTHOR
 

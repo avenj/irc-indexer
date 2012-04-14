@@ -57,20 +57,20 @@ sub spawn {
   croak "cannot use spawn() interface without a postback"
     unless $opts{postback};
   my $self = $pkg->new(%opts);
-  my $sess = $self->run();
-  my $sid  = $sess->ID;
-  return $sid
+  $self->run();
+  return $self->{sessid}
 }
 
 sub run {
   my ($self) = @_;
   ## Create POE session to manage forked Bot::Trawl
   
-  return POE::Session->create(
+  my $sess = POE::Session->create(
     object_states => [
       $self => [ qw/
         _start
         _stop
+        shutdown
         
         sess_sig_int
         
@@ -82,10 +82,14 @@ sub run {
       / ],
     ],
   );
-  
+
+  $self->{sessid} = $sess->ID;
+  return $self 
 }
 
 sub trawler_for { return $_[0]->{TrawlerOpts}->{server} }
+
+sub ID { return $_[0]->{sessid} }
 
 sub done {
   my ($self, $finished) = @_;
@@ -118,10 +122,13 @@ sub failed {
     $self->report->status('FAIL');
     $self->report->failed($reason);
     $self->report->finishedat(time);
+    
+    if (my $postback = delete $self->{POST}) {
+      $postback->($self);
+    }
+    
   } else {
     return unless ref $self->report;
-#    return "Unknown failure, no server()" 
-#      if $self->done and not $self->report->server;
     return unless defined $self->report->status
       and $self->report->status eq 'FAIL';
   }
@@ -155,6 +162,10 @@ sub sess_sig_int {
   $_[OBJECT]->kill_all;
 }
 
+sub shutdown {
+  $_[OBJECT]->kill_all;
+}
+
 sub kill_all {
   my ($self) = @_;
   for my $pidof (keys %{ $self->{wheels}->{by_pid} }) {
@@ -163,7 +174,9 @@ sub kill_all {
       $wheel->kill(9);
     }
   }
-  delete $self->{wheels}
+  delete $self->{wheels};
+
+  $self->failed("Terminated early") unless $self->done;
 }
 
 sub _start {
@@ -298,7 +311,7 @@ IRC::Indexer::Trawl::Forking - Forking Trawl::Bot instances
 
 See L<IRC::Indexer::Trawl::Bot> for usage details.
 
-This carries the same interface, but a trawler is forked off.
+This carries exactly the same interface, but a trawler is forked off.
 
 =head1 DESCRIPTION
 
