@@ -1019,7 +1019,6 @@ sub h_server {
         && defined $cfg->{Networks}->{$network}->{$server}
     ) {
       ## configured but not trawled (yet)
-      ## FIXME document this
       $reason = "PENDING $server ($network) pending trawler run";
     } else {
       $reason = "NO_SUCH No such server";
@@ -1146,10 +1145,6 @@ sub h_network {
     my $reason;
     if (defined $cfg->{Networks}->{$network}) {
       ## configured but not trawled
-      ## FIXME document this behavior:
-      ##  - if the network is configured and pending,
-      ##    and status is 404, first word will be PENDING
-      ##    if network is not configured first word will be 'NO_SUCH'
       $reason = "PENDING $network pending trawler run";
     } else {
       $reason = "NO_SUCH No such network";
@@ -1384,6 +1379,14 @@ of ways to make use of the exported data on the client side.
 
 Networks or servers that are configured but not yet trawled will report 
 a 404 error with a string indicating that the trawl run is pending.
+
+You can check 404s for network/server requests for status information.
+
+If the first word of the 404 content is PENDING, the requested item is 
+pending a trawler run.
+
+If the first word of the 404 content is NO_SUCH, the requested item is 
+not being indexed by the trawler.
 
 =head3 List
 

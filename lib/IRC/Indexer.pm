@@ -64,7 +64,15 @@ L<IRC::Indexer::POD::NetworkSpec> for details on exported data.
 
 =head1 TODO
 
+=over
+
+=item *
+More useful examples in examples/
+
+=item *
 Tests are currently terrible.
+
+=back
 
 =head1 BUGS
 

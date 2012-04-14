@@ -3,6 +3,7 @@ bin/ircindexer-server-json
 bin/ircindexer-single
 Build.PL
 Changes
+examples/chart_users_cron.pl
 INSTALL
 lib/IRC/Indexer.pm
 lib/IRC/Indexer/Conf.pm
