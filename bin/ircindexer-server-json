@@ -928,9 +928,10 @@ sub h_server {
         && defined $cfg->{Networks}->{$network}->{$server}
     ) {
       ## configured but not trawled (yet)
-      $reason = "$server ($network) configured but no data";
+      ## FIXME document this
+      $reason = "PENDING $server ($network) pending trawler run";
     } else {
-      $reason = "No such server";
+      $reason = "NO_SUCH No such server";
     }
 
     $kernel->yield( h_error_404 => $req, $resp, $reason );
@@ -1054,9 +1055,13 @@ sub h_network {
     my $reason;
     if (defined $cfg->{Networks}->{$network}) {
       ## configured but not trawled
-      $reason = "$network pending trawler run";
+      ## FIXME document this behavior:
+      ##  - if the network is configured and pending,
+      ##    and status is 404, first word will be PENDING
+      ##    if network is not configured first word will be 'NO_SUCH'
+      $reason = "PENDING $network pending trawler run";
     } else {
-      $reason = "No such network";
+      $reason = "NO_SUCH No such network";
     }
     $kernel->yield( h_error_404 => $req, $resp, $reason );
     return
