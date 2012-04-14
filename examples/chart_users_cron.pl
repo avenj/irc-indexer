@@ -18,11 +18,10 @@ use warnings;
 ## No output unless there's an error.
 
 ## Config me:
-my $json_server = 'http://rakshasa.oppresses.us:9220';
 #my $json_server = 'http://blackcobalt.net:8700';
-my $users_file  = '/tmp/my_users.db';
-my $chart       = '/tmp/my_chart.png';
-my $network     = 'CobaltIRC';
+#my $users_file  = '/tmp/my_users.db';
+#my $chart       = '/tmp/my_chart.png';
+#my $network     = 'CobaltIRC';
 
 die "Edit me and specify some paths!\n"
   unless $json_server and $users_file and $chart;
@@ -76,7 +75,7 @@ FETCH: {
     push(@{ $graphset->[0] }, $time);
     push(@{ $graphset->[1] }, $user_count);
     
-    ## Keep only 12 hrs worth of data.
+    ## Keep only 12 runs worth of data.
     if (@{ $graphset->[0] } > 12) {
       shift @{ $graphset->[0] };
       shift @{ $graphset->[1] };
@@ -123,9 +122,7 @@ FETCH: {
 ##  [ time, .. ],
 ##  [ count, .. ],
 
-## Calculate a y_max_value.
-## There's probably a smarter way, I just haven't spent enough time 
-## with the GD::Graph docs. :-)
+## This is braindead:
 my $user_set = $graphset->[1];
 my $max = 100;
 map { $max = $_ if $_ > $max } @$user_set;
