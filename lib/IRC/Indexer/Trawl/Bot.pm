@@ -190,7 +190,7 @@ sub shutdown {
   warn "-> Trawler shutdown called\n" if $self->verbose;
 
   $self->done(1) unless $self->done;  
-  $self->irc->yield('shutdown')   if ref $self->irc;
+  $self->irc->yield('shutdown', 2)   if ref $self->irc;
   $self->irc(1);
   
   if (my $postback = delete $self->{POST}) {
@@ -438,9 +438,7 @@ sub irc_322 {
   my ($chan, $users, $topic) = @$split;
   
   $chan  = decode_irc($chan);
-  $topic = decode_irc(
-    strip_color( strip_formatting($topic) )
-  );
+  $topic = decode_irc( strip_color(strip_formatting($topic)) );
   
   $users //= 0;
   $topic //= ''; 
@@ -482,7 +480,8 @@ IRC::Indexer::Trawl::Bot - Indexing trawler instance
     ## IPv6 trawler:
     UseIPV6 => 1,
     
-    ## Overall timeout for this server:
+    ## Overall timeout for this server
+    ## (The IRC component may time out sooner if the socket is bust)
     Timeout => 90,
     
     ## Interval between commands (LIST/LINKS/LUSERS):
@@ -537,9 +536,13 @@ Connects to a specified server, gathers some network information, and
 disconnects when either all requests appear to be fulfilled or the 
 specified timeout (defaults to 90 seconds) is reached.
 
+There are two ways to interact with a running trawler: the object 
+interface or a POE session postback.
+
 When the trawler is finished, $trawl->done() will be boolean true; if 
 there was some error, $trawl->failed() will be true and will contain a 
-scalar string describing the error.
+scalar string describing the error. See L</new> and L</run> if you'd 
+like to use the object interface.
 
 If a postback was specified at construction time, the event will be 
 posted when a trawler has finished. $_[ARG1]->[0] will contain the 
