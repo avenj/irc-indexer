@@ -325,4 +325,6 @@ can be used interchangably.
 
 Jon Portnoy <avenj@cobaltirc.org>
 
+L<http://www.cobaltirc.org>
+
 =cut

@@ -664,4 +664,6 @@ The safest way to shut down your trawler is to post a B<shutdown> event:
 
 Jon Portnoy <avenj@cobaltirc.org>
 
+L<http://www.cobaltirc.org>
+
 =cut

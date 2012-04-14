@@ -3,11 +3,6 @@ use 5.12.1;
 use strict;
 use warnings;
 
-## FIXME sighup handler
-##  stop and clear all existing trawlers in $obj
-##  clear and reload network cfg in $cfg
-##  re-init trawlers
-
 ## Core:
 use Config;
 use DB_File;
@@ -133,7 +128,8 @@ my $state = {
 
 my $cfg = { 
   ## Defaults.
-  Networks => {},
+  ## These will be pulled from our httpd.conf in get_cfg.
+  NetworkDir => undef,
   BindAddr   => '0.0.0.0',
   ServerPort => 8700,
   CacheDir   => undef,
@@ -147,6 +143,9 @@ my $cfg = {
   LogLevel => undef,
   LogHTTP  => 1,
   LogIRC   => 1,
+
+  ## Constructed by get_nets:
+  Networks   => {},
 };
 
 ## for managing trawler creation
@@ -158,10 +157,18 @@ my $ArrayConf = { };
 ## If we're missing CacheDir:
 my $jsmemcache = { };
 
+sub get_nets {
+  my $conf_obj = $obj->{Cfg};
+
+  die "Configuration directive missing: NetworkDir\n"
+    unless $cfg->{NetworkDir};
+
+  my $nethash = $conf_obj->parse_nets($cfg->{NetworkDir});
+  $cfg->{Networks} = $nethash;
+}
+
 sub get_cfg {
-  ## set up $cfg and logging
-  
-  ## FIXME catch sighup and call get_cfg again?
+  ## set up $cfg, networks, and logging
   
   die "No --config specified.\n" unless $opts->{config};
   
@@ -182,11 +189,8 @@ sub get_cfg {
     eval { $cfhash = $conf->parse_conf($cfpath) };
     die "Could not parse conf: $@" if $@;
   }
-  
-  unless ($cfhash->{NetworkDir}) {
-    die "Configuration directive missing: NetworkDir\n"
-  }
-    
+
+  ## Only copies our defined params, see $cfg      
   for my $thisopt (keys %$cfg) {
     $cfg->{$thisopt} = $cfhash->{$thisopt};
   }
@@ -224,10 +228,9 @@ sub get_cfg {
   }
   
   $cfg->{ServerPort} //= 8700;
-  
+
   ## Read server specifications:  
-  my $nethash = $conf->parse_nets($cfhash->{NetworkDir});
-  $cfg->{Networks} = $nethash;
+  get_nets();
 }
 
 
@@ -261,7 +264,6 @@ sub log_to {
 }
 
 sub poco_cfg_httpd {
-  
   $state->{htevents} = [ map { 'h_'.$_ } qw/
      error_404
      src
@@ -313,8 +315,10 @@ sub poco_init_session {
         _stop
 
         session_sig_int
+        session_sig_hup
 
         e_init_nets
+        e_rehash
 
         e_timer_chk
         e_trawler_run
@@ -344,6 +348,7 @@ sub _start {
   
   $kernel->sig('INT', 'session_sig_int');
   $kernel->sig('TERM', 'session_sig_int');
+  $kernel->sig('HUP', 'session_sig_hup');
 
   log_to('session', 'info', 'Session started');
 
@@ -359,7 +364,7 @@ sub _start {
 sub e_init_nets {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
 
-  ## called by either _start or _rehash
+  ## called by either _start or e_rehash
   
   ## clear configured trawlers in $ArrayConf
   $ArrayConf = { };
@@ -393,13 +398,59 @@ sub e_init_nets {
   $state->{stats}->{TotalNetworks} = $total_nets;
   $state->{stats}->{TotalServers}  = $total_servers;  
 
+  ## Reset our HasRun.
+  ## This may be a rehash.
+  $state->{hasrun} = {};
+
   $kernel->yield('e_timer_chk');
+}
+
+sub e_rehash {
+  my ($kernel, $heap) = @_[KERNEL, HEAP];
+
+  ## Suspend our check loop, e_init_nets will reset it.
+  $kernel->alarm('e_timer_chk');
+  
+  ## Stop any running trawler runs.
+  ## Running encoders for dead nets are automatically discarded.
+  ## (You might bottleneck for a few if they're throttled hard, though.)
+  NETWORK: for my $network (keys %{ $obj->{active_trawlers} }) {
+    log_to('irc', 'debug', "Suspending trawler for $network");
+    
+    my $trawler = delete $obj->{active_trawlers}->{$network};
+    
+    ## If there's no Session ID, this trawler isn't running.
+    my $sessid  = $trawler->ID // next NETWORK;
+    $kernel->post( $sessid, 'shutdown' );
+  }  ## NETWORK
+
+
+  ## Reload Networks cfg
+  my @prev_nets = keys %{ $cfg->{Networks} };
+  get_nets();
+
+  ## Check if any networks have disappeared.
+  ## If they have, we don't need their cache.
+  CFG: for my $old_net (@prev_nets) {
+    unless (defined $cfg->{Networks}->{$old_net}) {
+      cache_clear($old_net);
+    }
+  }
+
+  ## Re-initialize runs right now.
+  $kernel->call( $_[SESSION], 'e_init_nets');
+}
+
+sub session_sig_hup {
+  $_[KERNEL]->sig_handled();
+  $_[KERNEL]->call( $_[SESSION], 'e_rehash');
 }
 
 sub session_sig_int {
   warn "Exiting due to signal";
   $_[KERNEL]->yield('_stop');
 }
+
 
 sub _stop {
   ## Run some cleanup if needed.
@@ -424,7 +475,7 @@ sub _stop {
 
 sub e_timer_chk {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
-  my $state_run = $state->{hasrun}//={};
+  my $state_run = $state->{hasrun};
 
   ++$state->{stats}->{LoopTick};
   
@@ -732,6 +783,23 @@ sub db_close {
   }
 }
 
+sub db_unlink {
+  my ($network) = @_;
+  
+  ++$state->{stats}->{DB}->{Unlink};
+  
+  my $cachedir;
+  die "db_close called but no CacheDir configured"
+    unless $cachedir = $cfg->{CacheDir};
+
+  my $dbpath = join '/', $cachedir, $network;
+  
+  log_to('DB', 'debug', "db_unlink: $dbpath");
+
+  ## Not sure if we should die() ...
+  unlink($dbpath) or log_to('DB', 'warn', "db_unlink: $network: $!");
+}
+
 sub cachedir_write {
   my ($zipped, $network, $server) = @_;
   return unless $network;
@@ -787,6 +855,19 @@ sub cachedir_read {
   $state->{stats}->{DB}->{'RD_Avg'} = sprintf("%.6f", $avg) + 0;
   
   return $data
+}
+
+sub cache_clear {
+  my ($network) = @_;
+  return unless $network;
+  
+  log_to('DB', 'warn', "Clearing cache: $network");
+  
+  if ($cfg->{CacheDir}) {
+    db_unlink($network);
+  } else {
+    delete $jsmemcache->{Networks}->{$network}
+  }
 }
 
 sub cache_json {
@@ -1172,16 +1253,21 @@ sub js_worker_stdout {
   my ($zip, $network, $server) = splice @$item, 0, 4;
   unless ($network) {
     log_to('session', 'warn', "Invalid input from encoder!");
+    ++$state->{stats}->{EncoderWheels}->{BadResult};
     return
   }
   
   ++$state->{stats}->{EncoderWheels}->{Success};
 
-  ## got JSON back, cache_json it
-  cache_json($zip, $network, $server);
-  my $logstr = "Cached JSON for $network";
-  $logstr   .= " ($server)" if $server;
-  log_to('irc', 'info', $logstr);
+  ## got JSON back, cache_json it unless it's stale
+  if ($cfg->{Networks}->{$network}) {
+    cache_json($zip, $network, $server);
+    my $logstr = "Cached JSON for $network";
+    $logstr   .= " ($server)" if $server;
+    log_to('irc', 'info', $logstr);
+  } else {
+    log_to('irc', 'info', "Discarding JSON for stale network: $network");
+  }
 }
 
 sub js_worker_stderr {
@@ -1346,6 +1432,17 @@ necessarily the name specified in their configuration.
 Stats regarding the running instance are exported via B</stats>:
 
   http://my.server:8700/stats
+
+
+=head2 Reloading networks
+
+You can reload the existing networks set and force a rehash by sending a 
+SIGHUP to the server.
+
+Your NetworkDir will be re-scanned and any removed networks will be 
+pulled from the trawl cache. All networks will have their trawl runs 
+rescheduled immediately -- in other words, SIGHUP can also be used to 
+force a refresh.
 
 =head1 AUTHOR
 

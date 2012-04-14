@@ -8,8 +8,6 @@ use Carp;
 use POE;
 use IRC::Indexer::Trawl::Bot;
 
-use Storable qw/dclone/;
-
 sub new {
   my $self = {};
   my $class = shift;
