@@ -578,7 +578,7 @@ sub e_trawler_process {
   ## passed trawler objects marked as done (from _chk)
 
   my $orig_server = $trawler->trawler_for;
-  log_to('irc', 'info', "Processing trawler: $network: $orig_server");
+  log_to('irc', 'debug', "Processing trawler: $network: $orig_server");
   $state->{stats}->{LastTrawlerReaped} = $network;
 
   if (my $err = $trawler->failed) {
