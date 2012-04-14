@@ -30,7 +30,9 @@ DESCRIPTION
     ircindexer-server-json serves as an example of how to use the trawler
     system to index IRC networks; it is usable as-is to trawl sets of IRC
     servers belonging to configured networks and serve JSON-serialized
-    network stats via HTTP.
+    network stats via HTTP. This could be used directly to build an IRC
+    trawling/indexing Web application in a language of your choice, for
+    example.
 
     ircindexer-single can be used to trawl a single server in one shot,
     exporting to YAML, JSON, or Perl. See the documentation or
@@ -47,7 +49,10 @@ DESCRIPTION
     details on exported data.
 
 TODO
-    Tests are currently terrible.
+    * Nothing very useful is done with LINKS data; it's not always available
+    and is presented as-is. We should maybe export a hash.
+    * More useful examples in examples/
+    * Tests are currently terrible.
 
 BUGS
     Frankly, the fundamentals of this project were laid out on a hungover
