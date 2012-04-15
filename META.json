@@ -54,7 +54,7 @@
    "provides" : {
       "IRC::Indexer" : {
          "file" : "lib/IRC/Indexer.pm",
-         "version" : "0.01"
+         "version" : "0.02"
       },
       "IRC::Indexer::Conf" : {
          "file" : "lib/IRC/Indexer/Conf.pm",
@@ -115,5 +115,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.01"
+   "version" : "0.02"
 }
