@@ -161,9 +161,9 @@ sub done {
   }
 
   return unless ref $self->report;  
-  return unless defined $self->report->status
-         and $self->report->status eq 'DONE'
-         or  $self->report->status eq 'FAIL';
+  return unless $self->report->status;
+  return unless $self->report->status eq 'DONE'
+         or     $self->report->status eq 'FAIL';
   return $self->report->status
 }
 
@@ -195,7 +195,7 @@ sub shutdown {
 
   warn "-> Trawler shutdown called\n" if $self->verbose;
 
-  $self->done(1) unless $self->done;  
+  $self->done(1) unless $self->done;
   $self->irc->yield('shutdown', 2)   if ref $self->irc;
   $self->irc(1);
   
@@ -541,7 +541,8 @@ the backbone of the rest of the IRC::Indexer modules and utilities.
 
 Connects to a specified server, gathers some network information, and 
 disconnects when either all requests appear to be fulfilled or the 
-specified timeout (defaults to 90 seconds) is reached.
+specified timeout (defaults to 90 seconds) is reached. Uses 
+L<POE::Component::IRC> for an IRC transport.
 
 There are two ways to interact with a running trawler: the object 
 interface or a POE session postback.
