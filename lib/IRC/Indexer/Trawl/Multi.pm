@@ -82,7 +82,7 @@ sub _start {
     }
     
     $self->{Trawlers}->{$server} = IRC::Indexer::Trawl::Bot->new(
-      Server   => $server,
+      Server   => $server_name,
       Port     => $port,
       Nickname => $ircnick,
       Interval => $interval,
@@ -93,7 +93,7 @@ sub _start {
   }
   
   ## spawn a timer to check on them
-  $kernel->alarm('m_check_trawlers', time + 5);
+  $kernel->alarm('m_check_trawlers', time + 3);
 }
 
 sub m_check_trawlers {
@@ -102,16 +102,21 @@ sub m_check_trawlers {
   BOT: for my $server (keys %{ $self->{Trawlers} }) {
     my $trawler = $self->{Trawlers}->{$server};
     next BOT unless $trawler->done;
+
+    $poe_kernel->post( $trawler->ID, 'shutdown' );
     
-    my $ref = $trawler->dump;
+    my $ref = $trawler->failed ?  
+              { ConnectedTo => $server, Failure => $trawler->failed }
+                : $trawler->dump ;
     $self->{ResultSet}->{$server} = $ref;
   }
 
   if (keys %{$self->{ResultSet}} == keys %{$self->{Trawlers}}) {
+    $poe_kernel->alarm('m_check_trawlers');
     $self->done(1);
   } else {
     ## not done, reschedule
-    $kernel->alarm('m_check_trawlers', time + 5);
+    $kernel->alarm('m_check_trawlers', time + 3);
   }
 
 }
@@ -207,6 +212,14 @@ for each server that run in parallel; when they're all finished,
 B<done()> will return boolean true and B<dump()> will return a hash 
 reference, keyed on server name, of L<IRC::Indexer::Trawl::Bot> 
 netinfo() hashes.
+
+Servers option in constructor also accepts per-server hash references 
+created out of server spec files.
+
+=head1 BUGS
+
+Example module, mostly; hardly tested. Lacks a useful postback 
+interface. Patches welcome :-)
 
 =head1 AUTHOR
 
