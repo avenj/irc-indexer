@@ -799,7 +799,7 @@ sub db_unlink {
   ++$state->{stats}->{DB}->{Unlink};
   
   my $cachedir;
-  die "db_close called but no CacheDir configured"
+  die "db_unlink called but no CacheDir configured"
     unless $cachedir = $cfg->{CacheDir};
 
   my $dbpath = join '/', $cachedir, $network;
@@ -1372,8 +1372,8 @@ Uses L<POEx::HTTP::Server> to provide HTTP daemon functionality.
 JSON is encoded by forked L<IRC::Indexer::Process::JSONify> instances.
 
 Intended to serve as the back-end to a presentation system for the 
-data collected. See <IRC::Indexer::POD::ExampleClients> for some examples 
-of ways to make use of the exported data on the client side.
+data collected. See L<IRC::Indexer::POD::ExampleClients> for some 
+examples of ways to make use of the exported data on the client side.
 
 =head2 Fetching JSON
 
