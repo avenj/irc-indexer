@@ -142,6 +142,7 @@ my $graph = GD::Graph::lines3d->new(600, 300);
 $graph->set(
   x_label => 'Trawl Time',
   x_label_position => "1/2",
+  ## A bit stupid:
   x_label_skip => int($keep_runs/8),
   y_label => 'Network Users',
   title   => "Users",

@@ -1,5 +1,20 @@
 Changes for IRC::Indexer
 
+0.03 2012-04-15
+
+ - Report::Server->status(); report empty string, not undef
+   Makes it easier to test status strings.
+   
+ - Tweak examples/chart_users_cron.pl
+
+ - Trawl::Multi:
+    Properly cleanup when finished
+    Shorter initial check alarm
+    (Trawl::Multi still sucks; use Trawl::Bot.)
+
+ - t/ expanded; Add Test::Cmd tests, improve others.
+   Add Trawl::Multi test.
+
 0.02 2012-04-15
 
  - Add missing test t/03_runnable.t

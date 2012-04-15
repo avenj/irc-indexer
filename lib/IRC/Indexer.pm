@@ -77,9 +77,6 @@ and is presented as-is. We should maybe export a hash.
 =item *
 More useful examples in examples/
 
-=item *
-Tests are currently terrible.
-
 =back
 
 =head1 BUGS

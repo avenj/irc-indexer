@@ -93,7 +93,8 @@ sub _start {
   }
   
   ## spawn a timer to check on them
-  $kernel->alarm('m_check_trawlers', time + 3);
+  ## first timer run is Soon to check for socketerrs:
+  $kernel->alarm('m_check_trawlers', time + 1);
 }
 
 sub m_check_trawlers {
@@ -205,7 +206,8 @@ IRC::Indexer::Trawl::Multi - Trawl multiple IRC servers
 A simple manager for groups of L<IRC::Indexer::Trawl::Bot> instances.
 
 This is mostly an example; it is not used by any of the included 
-controllers and is not at all sophisticated.
+controllers and is not at all sophisticated. You're probably better off 
+managing your own pool of L<IRC::Indexer::Trawl::Bot> sessions.
 
 Given an array (reference) of server addresses, it will spawn trawlers 
 for each server that run in parallel; when they're all finished, 
