@@ -9,6 +9,8 @@ IRC::Indexer::POD::ClientExamples - Example indexer frontends
 This document offers some possible methods of putting IRC::Indexer 
 trawler output to use.
 
+Be sure to also see the B<examples/> directory in the distribution.
+
 =head1 JSON SERVER
 
 L<ircindexer-server-json> can be used to manage a set of trawlers, 
@@ -37,7 +39,11 @@ localhost:
     $networks = decode_json($json);
   } else {
     ## Retrieving JSON failed ...
-    ## die() with $response->status_line, or something
+    ## You can check for $response->code == 404
+    ## If the content() of the 404 starts with "PENDING" the trawl 
+    ## run is waiting for a successful completion; otherwise it is 
+    ## not an available network.
+    ## ... or just die()   :-)
   }
   
 Now $networks contains an array reference listing available network 

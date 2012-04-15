@@ -1,6 +1,13 @@
 Changes for IRC::Indexer
 
-0.01 ****-**-**
+0.02 2012-04-15
+
+ - Clean up examples/chart_users_cron.pl a bit.
+  (It's still pretty terrible. You're welcome.)
+
+ - Significant POD updates/cleanups
+
+0.01 2012-04-14
 
   Initial IRC::Indexer release.
   Prior history lives in git: 

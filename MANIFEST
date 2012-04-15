@@ -29,3 +29,4 @@ META.yml
 README
 t/01_loadable.t
 t/02_info.t
+t/03_runnable.t

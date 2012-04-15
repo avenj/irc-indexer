@@ -77,7 +77,7 @@ __END__
 
 =head1 NAME
 
-IRC::Indexer::Logger - simple interface to Log::Handler
+IRC::Indexer::Logger - Simple interface to Log::Handler
 
 =head1 SYNOPSIS
 
