@@ -1,6 +1,9 @@
 use strict; use warnings;
-use Test::More tests => 18;
+use Test::More tests => 22;
 use POE;
+
+## Tests Trawl::Bot/Forking
+## These should be compatible.
 
 my @compat;
 
@@ -12,6 +15,8 @@ BEGIN {
   use_ok($_) for @compat;
 }
 
+my $sname = 'Nonexist'.int(rand 666);
+
 for my $class (@compat) {
   diag($class);
   
@@ -19,7 +24,7 @@ for my $class (@compat) {
     inline_states => {
       '_start' => sub {
         my $trawler = new_ok( $class => [
-           Server   => 1,
+           Server   => $sname,
            Timeout  => 3,
            Postback => $_[SESSION]->postback('trawler_done'),
          ],
@@ -38,7 +43,11 @@ for my $class (@compat) {
         isa_ok( $trawler, $class );
         ok( $trawler->done, 'Trawler reports completion' );
         ok( $trawler->failed, 'Trawler reports failed' );
+        is( $trawler->trawler_for, $sname, 'trawler_for() is correct');
         isa_ok( $trawler->report, 'IRC::Indexer::Report::Server' );
+        is( $trawler->report->connectedto, $sname, 
+          'connectedto() is correct'
+        );
         $_[KERNEL]->post( $trawler->ID, 'shutdown' );
       },
     },

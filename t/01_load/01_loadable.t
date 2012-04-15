@@ -1,4 +1,4 @@
-use Test::More tests => 14;
+use Test::More tests => 16;
 
 use File::Spec;
 
@@ -22,5 +22,9 @@ BEGIN {
 
 new_ok( 'IRC::Indexer::Trawl::Bot'     => [ Server => 'localhost']);
 new_ok( 'IRC::Indexer::Trawl::Forking' => [ Server => 'localhost']);
+new_ok( 'IRC::Indexer::Trawl::Multi'   => [ Servers => 
+  [ 'localhost', [ '127.0.0.1', 6669 ] ]
+]);
 
 new_ok( 'IRC::Indexer::Logger' => [ LogFile => File::Spec->devnull ]);
+new_ok( 'IRC::Indexer::Conf' );
