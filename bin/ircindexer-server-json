@@ -496,7 +496,7 @@ sub e_timer_chk {
       }
 
       ## Space out our initial runs.
-      log_to('irc', 'info', "Scheduling initial trawler for $network");
+      log_to('irc', 'debug', "Scheduling initial trawler for $network");
       $kernel->alarm_add( 'e_trawler_run', time + ($sp+=1),
         $ArrayConf->{$network}->[0] 
       );
@@ -1269,7 +1269,7 @@ sub js_worker_stdout {
     cache_json($zip, $network, $server);
     my $logstr = "Cached JSON for $network";
     $logstr   .= " ($server)" if $server;
-    log_to('irc', 'info', $logstr);
+    log_to('irc', 'debug', $logstr);
   } else {
     log_to('irc', 'info', "Discarding JSON for stale network: $network");
   }
