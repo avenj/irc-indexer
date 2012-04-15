@@ -70,16 +70,20 @@ __END__
 
 =head1 NAME
 
-IRC::Indexer::Process::JSONify - Forking JSON encoder
+IRC::Indexer::Process::JSONify - Forkable JSON encoder
 
 =head1 SYNOPSIS
 
-See B<ircindexer-server-json>
+See L<ircindexer-server-json>
 
 =head1 DESCRIPTION
 
 A small forkable JSON encoder, usable by L<POE::Wheel::Run> wheels to 
 externally encode JSON.
+
+Used by L<ircindexer-server-json> to offload some processing and reduce 
+the long-term memory footprint of the master (at the cost of some extra 
+forking overhead).
 
 Given an array containing a hash, a network name, and possibly a server 
 name, returns an array containing a JSON hash, the gzipped 

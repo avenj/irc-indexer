@@ -93,13 +93,16 @@ See L<IRC::Indexer::Trawl::Forking> and L<IRC::Indexer::Trawl::Bot>
 
 =head1 DESCRIPTION
 
-A forkable POE instance managing a L<IRC::Indexer::Trawl::Bot> instance; 
+A forkable process managing a L<IRC::Indexer::Trawl::Bot> instance; 
 this is the worker used by L<IRC::Indexer::Trawl::Forking> via 
 L<POE::Wheel::Run> and L<POE::Filter::Reference>.
 
 Given an array containing a server tag and a trawler configuration to 
 pass through to L<IRC::Indexer::Trawl::Bot>, runs a single trawler until 
 it is complete and returns a server information hash.
+
+See L<IRC::Indexer::Trawl::Bot> for details on the non-forking 
+asynchronous interface.
 
 =head1 AUTHOR
 

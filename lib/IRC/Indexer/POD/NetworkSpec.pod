@@ -37,6 +37,7 @@ These are documented further in L<IRC::Indexer::POD::ServerSpec>.
   Servers => {
     SERVER-NAME => {
       TrawledAt => TIME
+      IRCD => STRING (server version)
       MOTD => [ ARRAY of MOTD lines ]  ## OPTIONAL
     }
   }

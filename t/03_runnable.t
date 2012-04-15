@@ -1,5 +1,5 @@
 use strict; use warnings;
-use Test::More tests => 14;
+use Test::More tests => 18;
 use POE;
 
 my @compat;
@@ -13,6 +13,7 @@ BEGIN {
 }
 
 for my $class (@compat) {
+  diag($class);
   
   POE::Session->create(
     inline_states => {
@@ -35,7 +36,9 @@ for my $class (@compat) {
         my $trawler = $_[ARG1]->[0];
         
         isa_ok( $trawler, $class );
-        ok( $trawler->failed );
+        ok( $trawler->done, 'Trawler reports completion' );
+        ok( $trawler->failed, 'Trawler reports failed' );
+        isa_ok( $trawler->report, 'IRC::Indexer::Report::Server' );
         $_[KERNEL]->post( $trawler->ID, 'shutdown' );
       },
     },
