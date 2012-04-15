@@ -129,8 +129,7 @@ sub failed {
     
   } else {
     return unless ref $self->report;
-    return unless defined $self->report->status
-      and $self->report->status eq 'FAIL';
+    return unless $self->report->status eq 'FAIL';
   }
   
   return $self->report->failed
@@ -140,8 +139,7 @@ sub dump {
   my ($self) = @_;
 
   return unless ref $self->report;
-  return unless defined $self->report->status
-    and $self->report->status ~~  [ qw/DONE FAIL/ ];
+  return unless $self->report->status ~~  [ qw/DONE FAIL/ ];
   return $self->report->netinfo
 }
 
@@ -320,6 +318,11 @@ own Perl interpreter.
 
 Carries exactly the same interface as L<IRC::Indexer::Trawl::Bot> and 
 can be used interchangably.
+
+This is useful when pulling very large trawl runs; it can take advantage 
+of more CPU cores when composing Reports and tends to reduce the 
+long-term memory footprint of a controller when trawling multiple large networks 
+(at the cost of extra overhead when forking).
 
 =head1 AUTHOR
 

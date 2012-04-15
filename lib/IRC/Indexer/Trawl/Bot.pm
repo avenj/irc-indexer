@@ -35,8 +35,9 @@ sub new {
 
   $self->{ircserver} = $args{server} 
     || croak "No Server specified in new" ;
-  $self->{ircport} = $args{port} || 6667 ;
-  $self->{ircnick} = $args{nickname} || 'iindx'.(int rand 666);
+
+  $self->{ircport} = $args{port}     || 6667 ;
+  $self->{ircnick} = $args{nickname} || 'iindx'.(int rand 666);  
   
   $self->{bindaddr} = $args{bindaddr} if $args{bindaddr};
   $self->{useipv6}  = $args{ipv6} || 0;
@@ -141,9 +142,6 @@ sub failed {
     $self->report->failed($reason);
     $self->report->finishedat(time);
   } else {
-#    return "Unknown failure, no server()"
-#      if $self->done and not $self->report->server;
-
     return unless defined $self->report->status 
            and $self->report->status eq 'FAIL';
   }
@@ -161,7 +159,6 @@ sub done {
   }
 
   return unless ref $self->report;  
-  return unless $self->report->status;
   return unless $self->report->status eq 'DONE'
          or     $self->report->status eq 'FAIL';
   return $self->report->status
@@ -592,8 +589,8 @@ See L</SYNOPSIS> for constructor options.
 Construct and immediately run a trawler from within a running 
 L<POE::Session>.
 
-Returns a POE session ID that can be used to post L</shutdown> events if 
-needed. 
+Returns a POE session ID that can be used to post L</shutdown> events 
+if needed.
 
 See L</SYNOPSIS> for constructor options.
 

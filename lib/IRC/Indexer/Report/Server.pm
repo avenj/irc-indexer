@@ -76,7 +76,7 @@ sub finishedat {
 }
 
 sub status {
-  ## undef = nuthin' doin'
+  ## empty string = nuthin' doin'
   ## INIT  = socket connected
   ## CONNECTED = irc_001
   ## DONE = finished
@@ -84,7 +84,7 @@ sub status {
   my ($self, $status) = @_;
   return $self->netinfo->{Status} = $status
     if defined $status;
-  return $self->netinfo->{Status}
+  return $self->netinfo->{Status}//''
 }
 
 sub failed {
