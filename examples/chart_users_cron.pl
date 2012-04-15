@@ -70,7 +70,8 @@ FETCH: {
     my $netinfo = decode_json($json);
     
     my $user_count = $netinfo->{GlobalUsers} // 0;
-    my $time = join ':', localtime->hour, localtime->min;
+    my $t = localtime->hms;
+    my $time = join ':', (split /:/, $t)[0,1];
   
     push(@{ $graphset->[0] }, $time);
     push(@{ $graphset->[1] }, $user_count);
@@ -125,20 +126,21 @@ FETCH: {
 ## This is braindead:
 my $user_set = $graphset->[1];
 my $max = 100;
-map { $max = $_ if $_ > $max } @$user_set;
 my $min = 50;
-map { $min = $_ if $_ < $min } @$user_set;
+use POSIX ();
+map { $max = (POSIX::ceil($_ /25) * 25)  if $_ > $max } @$user_set;
+map { $min = (POSIX::floor($_ /25) * 25) if $_ < $min } @$user_set;
 
 my $graph = GD::Graph::lines3d->new(600, 300);
 $graph->set(
   x_ticks => 5,
   x_label => 'Trawl Time',
+  x_label_position => "1/2",
   y_label => 'Network Users',
-  title   => "Users, last 12 runs",
+  title   => "Users",
   y_min_value   => $min,
   y_max_value   => $max,
   y_tick_number => 10,
-  y_label_skip  => 10,
 ) or die $graph->error;
 
 my $gd = $graph->plot($graphset)
