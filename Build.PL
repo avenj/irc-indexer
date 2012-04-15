@@ -16,6 +16,7 @@ my $build = Module::Build->new(
   
   build_requires => {
     'Test::More' => 0,
+    'Test::Cmd'  => 0,
   },
   
   requires => {
