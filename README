@@ -55,7 +55,6 @@ TODO
     * Nothing very useful is done with LINKS data; it's not always available
     and is presented as-is. We should maybe export a hash.
     * More useful examples in examples/
-    * Tests are currently terrible.
 
 BUGS
     Frankly, the fundamentals of this project were laid out on a hungover

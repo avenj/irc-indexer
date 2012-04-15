@@ -16,6 +16,7 @@
    "prereqs" : {
       "build" : {
          "requires" : {
+            "Test::Cmd" : 0,
             "Test::More" : 0
          }
       },
@@ -47,14 +48,14 @@
             "Time::HiRes" : 0,
             "URI" : 0,
             "YAML::XS" : 0,
-            "perl" : "v5.12.1"
+            "perl" : "v5.10.1"
          }
       }
    },
    "provides" : {
       "IRC::Indexer" : {
          "file" : "lib/IRC/Indexer.pm",
-         "version" : "0.02"
+         "version" : "0.03"
       },
       "IRC::Indexer::Conf" : {
          "file" : "lib/IRC/Indexer/Conf.pm",
@@ -115,5 +116,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.02"
+   "version" : "0.03"
 }

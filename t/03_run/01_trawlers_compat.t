@@ -18,7 +18,7 @@ BEGIN {
 my $sname = 'Nonexist'.int(rand 666);
 
 for my $class (@compat) {
-  diag($class);
+  diag("Testing $class");
   
   POE::Session->create(
     inline_states => {

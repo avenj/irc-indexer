@@ -32,12 +32,9 @@ t/01_load/01_trawlers.t
 t/01_load/02_reports.t
 t/01_load/03_output.t
 t/01_load/04_helpers.t
-t/01_loadable.t
-t/02_info.t
 t/02_report/01_reports.t
 t/03_run/01_trawlers_compat.t
 t/03_run/02_trawl_multi.t
-t/03_runnable.t
 t/04_cmd/01_cmd_single.t
 t/04_cmd/02_cmd_server_json.t
 t/04_cmd/03_cmd_examplecf.t

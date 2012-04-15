@@ -3,6 +3,7 @@ abstract: 'IRC network indexing system'
 author:
   - 'Jon Portnoy <avenj@cobaltirc.org>'
 build_requires:
+  Test::Cmd: 0
   Test::More: 0
 configure_requires:
   Module::Build: 0.38
@@ -16,7 +17,7 @@ name: IRC-Indexer
 provides:
   IRC::Indexer:
     file: lib/IRC/Indexer.pm
-    version: 0.02
+    version: 0.03
   IRC::Indexer::Conf:
     file: lib/IRC/Indexer/Conf.pm
     version: 0
@@ -78,7 +79,7 @@ requires:
   Time::HiRes: 0
   URI: 0
   YAML::XS: 0
-  perl: v5.12.1
+  perl: v5.10.1
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.02
+version: 0.03
