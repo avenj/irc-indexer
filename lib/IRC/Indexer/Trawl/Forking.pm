@@ -6,7 +6,7 @@ package IRC::Indexer::Trawl::Forking;
 ## Provide compatible methods w/ Bot::Trawl
 ## Other layers can use this with the same interface.
 
-use 5.12.1;
+use 5.10.1;
 use strict;
 use warnings;
 use Carp;

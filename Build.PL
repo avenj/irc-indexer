@@ -19,7 +19,7 @@ my $build = Module::Build->new(
   },
   
   requires => {
-    'perl' => '5.12.1',
+    'perl' => '5.10.1',
     
     'Carp'         => 0,
     'POSIX'        => 0,

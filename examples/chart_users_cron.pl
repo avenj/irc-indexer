@@ -25,6 +25,8 @@ use warnings;
 #my $users_file  = '/tmp/my_users.db';
 #my $chart       = '/tmp/my_chart.png';
 #my $network     = 'CobaltIRC';
+## How many runs to store.
+my $keep_runs    = 64;
 
 die "Edit me and specify some paths!\n"
   unless $json_server and $users_file and $chart;
@@ -78,8 +80,7 @@ FETCH: {
     push(@{ $graphset->[0] }, $time);
     push(@{ $graphset->[1] }, $user_count);
     
-    ## Keep only 12 runs worth of data:
-    if (@{ $graphset->[0] } > 12) {
+    if (@{ $graphset->[0] } > $keep_runs) {
       shift @{ $graphset->[0] };
       shift @{ $graphset->[1] };
     }
@@ -139,9 +140,9 @@ map { $min = (POSIX::floor($_ /25) * 25) if $_ < $min } @$user_set;
 
 my $graph = GD::Graph::lines3d->new(600, 300);
 $graph->set(
-  x_ticks => 5,
   x_label => 'Trawl Time',
   x_label_position => "1/2",
+  x_label_skip => int($keep_runs/8),
   y_label => 'Network Users',
   title   => "Users",
   y_min_value   => $min,
