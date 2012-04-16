@@ -366,17 +366,7 @@ sub _start {
   ## init httpd
   my @htstates = poco_cfg_httpd();
 
-  ## if that worked (port was bound), we're running:
-  my $pidfile = $opts->{pidfile} || $cfg->{PidFile} || undef;
-  if ($pidfile) {
-    open my $fh, '>', $pidfile
-      or die "PID file specified but unable to write: $pidfile: $!";
-    print $fh $$;
-    close $fh;
-  }
-
-  ## call() to try to avoid http reqs before e_init_nets
-  $kernel->call( $_[SESSION], 'e_init_nets' );
+  $kernel->post( $_[SESSION], 'e_init_nets' );
   
   ## add states from $state->{htevents}
   $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};  
@@ -385,7 +375,7 @@ sub _start {
 sub e_init_nets {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
 
-  ## called by either _start or e_rehash
+  ## Called by _start & rehash.
   
   ## clear configured trawlers in $ArrayConf
   $ArrayConf = { };
@@ -400,8 +390,8 @@ sub e_init_nets {
       
       log_to('irc', 'info', "Init trawler: $network -> $server");
 
-      ## push configuration to array
-      ## create_trawler in e_trawler_run     
+      ## Push configuration to array
+      ## we'll create_trawler() in e_trawler_run
       my %trawlopts = %$this_cf;
       push(@{$ArrayConf->{$network}}, 
         [ $network, $server, { Server => $server, %trawlopts } ]
@@ -474,8 +464,11 @@ sub session_sig_int {
 }
 
 
-sub _stop {
+sub _stop {  
+  log_to('session', 'warn', "_stop received");
+  
   ## Run some cleanup if needed.
+  
   for my $pidof (keys %{ $obj->{workers_by_pid} }) {
     my $wheel = delete $obj->{workers_by_pid}->{$pidof};
     next unless ref $wheel;
@@ -489,7 +482,11 @@ sub _stop {
       db_close($network);
     }
   }
-  log_to('session', 'warn', "_stop received");
+
+  if ($state->{wrote_pid_file}) {
+    unlink($state->{wrote_pid_file})
+      or warn "could not clean up pidfile: $!";
+  }
 
   ## HTTP server should pick up shutdown and clean up.
   $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
@@ -502,6 +499,19 @@ sub e_timer_chk {
   ++$state->{stats}->{LoopTick};
   
   my @trawlers;
+
+  ## PID write is here so we can fail out properly if HTTPd can't start:
+  unless ($state->{wrote_pid}) {
+    my $pidfile = $opts->{pidfile} || $cfg->{PidFile} || undef;
+    if ($pidfile) {
+      open my $fh, '>', $pidfile
+        or die "PID file specified but unable to write: $pidfile: $!";
+      print $fh $$;
+      close $fh;
+    }
+    ++$state->{wrote_pid};
+    $state->{wrote_pid_path} = $pidfile;
+  }
 
   my $sp = 0;
   NETWORK: for my $network (keys %$ArrayConf) {
