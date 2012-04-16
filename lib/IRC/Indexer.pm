@@ -1,5 +1,5 @@
 package IRC::Indexer;
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 ## stub! for now ..
 
@@ -40,9 +40,9 @@ IRC::Indexer is a set of modules and utilities useful for trawling IRC
 networks, collecting information, and exporting it to portable formats 
 for use in Web frontends and other applications.
 
-L<ircindexer-server-json> serves as an example of how to use the trawler 
-system to index IRC networks; it is usable as-is to trawl sets of IRC 
-servers belonging to configured networks and serve JSON-serialized 
+L<ircindexer-server-json> serves as a real world example of how to use 
+the trawler system to index IRC networks; it is usable as-is to trawl 
+sets of IRC servers belonging to configured networks and serve JSON-serialized 
 network stats via HTTP.
 
 L<ircindexer-server-json> is fairly scalable; this could be 

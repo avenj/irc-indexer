@@ -355,6 +355,7 @@ sub _start {
   ## init httpd
   my @htstates = poco_cfg_httpd();
 
+  ## call() to try to avoid http reqs before e_init_nets
   $kernel->call( $_[SESSION], 'e_init_nets' );
   
   ## add states from $state->{htevents}

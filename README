@@ -27,10 +27,10 @@ DESCRIPTION
     networks, collecting information, and exporting it to portable formats
     for use in Web frontends and other applications.
 
-    ircindexer-server-json serves as an example of how to use the trawler
-    system to index IRC networks; it is usable as-is to trawl sets of IRC
-    servers belonging to configured networks and serve JSON-serialized
-    network stats via HTTP.
+    ircindexer-server-json serves as a real world example of how to use the
+    trawler system to index IRC networks; it is usable as-is to trawl sets
+    of IRC servers belonging to configured networks and serve
+    JSON-serialized network stats via HTTP.
 
     ircindexer-server-json is fairly scalable; this could be used directly
     to build an IRC trawling/indexing Web application in a language of your
