@@ -5,6 +5,8 @@ use strict;
 use warnings;
 use Carp;
 
+use Scalar::Util qw/openhandle/;
+
 sub new {
   my $class = shift;
   my $self  = {};
@@ -37,11 +39,15 @@ sub write {
   unless ($out = $self->{Output}) {
     croak "write() called but no Output to write" ;
   }
-  
-  open my $fh, '>:encoding(utf8)', $path 
-    or croak "open failed in write(): $!";
-  print $fh $out;
-  close $fh;
+
+  if ( openhandle($path) ) {
+    print $path $out;
+  } else {
+    open my $fh, '>:encoding(utf8)', $path 
+      or croak "open failed in write(): $!";
+    print $fh $out;
+    close $fh;
+  }
 }
 
 1;
