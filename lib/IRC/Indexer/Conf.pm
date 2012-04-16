@@ -114,9 +114,13 @@ sub write_example_cf {
   
   my $conf = $self->get_example_cf($cftype); 
 
-  open my $fh, '>', $path or die "open failed: $!\n";
-  print $fh $conf;
-  close $fh;
+  if ( openhandle($path) ) {
+    print $path $conf;
+  } else {
+    open my $fh, '>', $path or die "open failed: $!\n";
+    print $fh $conf;
+    close $fh;
+  }
 }
 
 sub example_cf_spec {

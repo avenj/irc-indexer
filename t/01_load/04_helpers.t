@@ -1,4 +1,4 @@
-use Test::More tests => 20;
+use Test::More tests => 23;
 use strict; use warnings;
 use File::Spec;
 
@@ -86,3 +86,11 @@ ok( open($fh, '<', \$speccf), 'Server spec open' );
 ok( $cf = IRC::Indexer::Conf->parse_conf($fh), 'Specfile parse_conf()' );
 close $fh;
 ok( defined $cf->{Network}, 'Server spec has Network' );
+
+$fh = undef;
+$cf = undef;
+ok( open($fh, '>', \$cf), 'Output FH open' );
+ok( IRC::Indexer::Conf->write_example_cf('httpd', $fh), 
+  'write_example_cf() to scalar FH'
+);
+like( $cf, qr/^---/, 'write_example_cf() looks like YAML' );
