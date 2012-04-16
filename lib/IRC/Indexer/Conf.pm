@@ -148,6 +148,16 @@ sub example_cf_httpd {
 ---
 ### Example HTTPD conf
 
+## ServerPort:
+##
+## Port to run this HTTPD instance on.
+ServerPort: 8700
+
+## BindAddr:
+##
+## Optional local address to bind HTTPD to.
+#BindAddr: '0.0.0.0'
+
 ## NetworkDir:
 ##
 ## Network spec files will be found recursively under NetworkDir:
@@ -179,6 +189,43 @@ NetworkDir: /home/ircindex/networks
 ## there will be some extra processing overhead when results are 
 ## cached.
 CacheDir: /home/ircindex/jsoncache
+
+## LogFile:
+##
+## Path to log file.
+## If omitted, no logging takes place.
+LogFile: /home/ircindex/indexer.log
+
+## LogLevel:
+##
+## Log verbosity level.
+## 'debug', 'info', or 'warn'
+LogLevel: info
+
+## LogHTTP:
+##
+## If true, log HTTP-related activity
+## Defaults to ON
+LogHTTP: 1
+
+## LogIRC:
+##
+## If true, log trawling-related activity
+## Defaults to ON
+LogIRC: 1
+
+## PidFile:
+##
+## If a PidFile is specified, the server's PID will be written to the 
+## specified file.
+#PidFile:
+
+## TrawlInterval:
+##
+## Delay (in seconds) between trawl runs per-network.
+## Can be overriden with the --interval command opt.
+## Defaults to 600 (10 mins)
+#TrawlInterval: 600
 
 ## Forking:
 ##
@@ -231,40 +278,6 @@ Forking: 0
 ##
 ## Expensive in terms of CPU and space.
 ListChans: 0
-
-## ServerPort:
-##
-## Port to run this HTTPD instance on.
-ServerPort: 8700
-
-## BindAddr:
-##
-## Optional address to bind to.
-#BindAddr: '0.0.0.0'
-
-## LogFile:
-##
-## Path to log file.
-## If omitted, no logging takes place.
-LogFile: /home/ircindex/indexer.log
-
-## LogLevel:
-##
-## Log verbosity level.
-## 'debug', 'info', or 'warn'
-LogLevel: info
-
-## LogHTTP:
-##
-## If true, log HTTP-related activity
-## Defaults to ON
-LogHTTP: 1
-
-## LogIRC:
-##
-## If true, log trawling-related activity
-## Defaults to ON
-LogIRC: 1
 
 END
 
