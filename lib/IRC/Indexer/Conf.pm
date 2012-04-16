@@ -5,6 +5,8 @@ use strict;
 use warnings;
 use Carp;
 
+use Scalar::Util qw/openhandle/;
+
 use File::Find;
 
 use YAML::XS ();
@@ -16,7 +18,7 @@ sub slurp {
   
   my $slurped;
   
-  if (ref $path eq 'GLOB') {
+  if ( openhandle($path) ) {
     local $/; $slurped = <$path>;
   } else {
     open my $fh, '<:encoding(utf8)', $path 
