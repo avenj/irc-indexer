@@ -107,7 +107,7 @@ sub add_server {
   my ($self, $info) = @_;
   ## given a Report::Server object (or subclass), merge to this Network
   croak "add_server needs an IRC::Indexer::Report::Server obj"
-    unless blessed $info;
+    unless blessed $info and $info->isa('IRC::Indexer::Report::Server');
   
   ## keyed on reported server name
   ## will "break"-ish on dumb nets announcing dumb names:
