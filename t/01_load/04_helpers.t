@@ -1,4 +1,4 @@
-use Test::More tests => 12;
+use Test::More tests => 20;
 use strict; use warnings;
 use File::Spec;
 
@@ -55,6 +55,7 @@ my $fh;
 ok( open($fh, '<', \$mycf), 'Scalar FH open' );
 my $cf;
 ok( $cf = IRC::Indexer::Conf->parse_conf($fh), 'parse_conf()' );
+close $fh;
 is_deeply( $cf,
   {
     Scalar => "String",
@@ -63,4 +64,25 @@ is_deeply( $cf,
   },
   'parse_conf() compare'
 );
+$fh = undef;
+$cf = undef;
 
+my($htcf, $speccf);
+ok( $htcf = IRC::Indexer::Conf->get_example_cf('httpd'),
+  "Get example HTTPD conf" 
+);
+ok( $speccf = IRC::Indexer::Conf->get_example_cf('spec'),
+  "Get example specfile"
+);
+
+ok( open($fh, '<', \$htcf), 'HTTPD conf open' );
+ok( $cf = IRC::Indexer::Conf->parse_conf($fh), 'HTTPD parse_conf()' );
+close $fh;
+ok( defined $cf->{NetworkDir}, "HTTPD conf has NetworkDir" );
+$fh = undef;
+$cf = undef;
+
+ok( open($fh, '<', \$speccf), 'Server spec open' );
+ok( $cf = IRC::Indexer::Conf->parse_conf($fh), 'Specfile parse_conf()' );
+close $fh;
+ok( defined $cf->{Network}, 'Server spec has Network' );
