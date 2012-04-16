@@ -1,6 +1,7 @@
 package IRC::Indexer::Process::Trawler;
 
 ## Handled by Trawl::Forking
+## Should be a proper session, really.
 
 use strict;
 use warnings;

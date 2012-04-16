@@ -31,7 +31,7 @@ my $build = Module::Build->new(
     'Digest::SHA'  => 0,
     
     'File::Find' => 0,
-    'File::Path' => 0,
+    'File::Path' => '2.00',
     'File::Spec' => 0,
     
     'Time::HiRes' => 0,
@@ -43,7 +43,7 @@ my $build = Module::Build->new(
     'POE' => '1.311',
 
    ## IRC
-    'IRC::Utils' => 0,
+    'IRC::Utils' => '0.11',
     'POE::Component::IRC' => '6.74',
 
    ## HTTP

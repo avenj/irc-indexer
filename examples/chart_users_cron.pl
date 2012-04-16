@@ -130,8 +130,10 @@ my $user_set = $graphset->[1];
 my $max = 100;
 my $min = 50;
 use POSIX ();
-map { $max = (POSIX::ceil($_ /25) * 25)+25  if $_ > $max } @$user_set;
-map { $min = (POSIX::floor($_ /25) * 25) if $_ < $min } @$user_set;
+for (@$user_set) {
+  $max = POSIX::ceil($_ /25) * 25 + 25 if $_ > $max;
+  $min = POSIX::floor($_ /25) * 25 if $_ < $min;
+}
 
 ## GD::Graph does a great many things.
 ##  ... most of them I haven't actually looked at myself.
