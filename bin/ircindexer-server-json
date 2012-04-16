@@ -49,15 +49,20 @@ my $opts = {
       "  -c, --config=PATH\n",
       "       Configuration file for this server.\n\n",
       
-      "  -l, --loglevel=LEVEL\n",
-      "      Log verbosity, one of: debug, info, warn\n",
-      "      Overrides configuration file.\n\n",
-      
       "  -d, --detach\n",
       "       Run as a daemon process.\n\n",
       
+      "  -p, --pidfile\n",
+      "       Write our PID to the specified path.\n",
+      "       Overrides configuration file.\n\n",
+
+      "  -l, --loglevel=LEVEL\n",
+      "       Log verbosity, one of: debug, info, warn\n",
+      "       Overrides configuration file.\n\n",      
+      
       "  -i, --interval=SECS\n",
       "       Interval between trawling servers on a specific network.\n",
+      "       Overrides configuration file.\n",
       "       Defaults to 600 seconds (10 minutes)\n",
     );
     exit 0
@@ -85,10 +90,12 @@ GetOptions( $opts,
     config=s
     
     detach!
-
-    interval=i
     
+    pidfile=s
+
     loglevel=s
+
+    interval=i   
     
     showsource
   /,
@@ -132,8 +139,12 @@ my $cfg = {
   NetworkDir => undef,
   BindAddr   => '0.0.0.0',
   ServerPort => 8700,
-  CacheDir   => undef,
   ListChans  => undef,
+  
+  CacheDir   => undef,
+  PidFile    => undef,
+
+  TrawlInterval => 600,
 
   Forking => 0,
   MaxEncoders => 20,
@@ -355,6 +366,15 @@ sub _start {
   ## init httpd
   my @htstates = poco_cfg_httpd();
 
+  ## if that worked (port was bound), we're running:
+  my $pidfile = $opts->{pidfile} || $cfg->{PidFile} || undef;
+  if ($pidfile) {
+    open my $fh, '>', $pidfile
+      or die "PID file specified but unable to write: $pidfile: $!";
+    print $fh $$;
+    close $fh;
+  }
+
   ## call() to try to avoid http reqs before e_init_nets
   $kernel->call( $_[SESSION], 'e_init_nets' );
   
@@ -517,7 +537,8 @@ sub e_timer_chk {
       ## Schedule the next one for this net to run in ten minutes.
       my $next_trawler = $ArrayConf->{$network}->[0];
       if (defined $next_trawler) {
-        my $next_run_at  = time + ($opts->{interval} || 600);
+        my $interval = $opts->{interval} || $cfg->{TrawlInterval} || 600;
+        my $next_run_at  = time + $interval;
         $kernel->alarm_add(
           'e_trawler_run', $next_run_at, $next_trawler
         );
