@@ -193,7 +193,7 @@ sub shutdown {
   warn "-> Trawler shutdown called\n" if $self->verbose;
 
   $self->done(1) unless $self->done;
-  $self->irc->yield('shutdown', 2)   if ref $self->irc;
+  $self->irc->yield('shutdown', "Leaving", 2)   if ref $self->irc;
   $self->irc(1);
   
   if (my $postback = delete $self->{POST}) {
