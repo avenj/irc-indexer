@@ -1,5 +1,15 @@
 Changes for IRC::Indexer
 
+0.04 2012-04-16
+
+ - Allow parsing confs from previously-opened file handles.
+
+ - Fix POE::Component::IRC shutdown timeout.
+ 
+ - t/01_load/ :
+   01_loadable,t; Deprecated, deleted
+   04_helpers.t; Test IRC::Indexer::Conf & ::Logger properly
+
 0.03 2012-04-15
 
  - Report::Server->status(); report empty string, not undef

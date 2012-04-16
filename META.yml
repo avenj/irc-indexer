@@ -17,7 +17,7 @@ name: IRC-Indexer
 provides:
   IRC::Indexer:
     file: lib/IRC/Indexer.pm
-    version: 0.03
+    version: 0.04
   IRC::Indexer::Conf:
     file: lib/IRC/Indexer/Conf.pm
     version: 0
@@ -82,4 +82,4 @@ requires:
   perl: v5.10.1
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.03
+version: 0.04

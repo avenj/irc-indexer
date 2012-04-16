@@ -8,7 +8,7 @@ use Config;
 use DB_File;
 use Fcntl qw/:DEFAULT :flock/;
 use Digest::SHA  qw/sha1_hex/;
-use File::Path   qw/make_path remove_tree/;
+use File::Path   qw/make_path/;
 use Scalar::Util qw/blessed/;
 use Storable     qw/dclone/;
 use POSIX ();
@@ -628,10 +628,10 @@ sub e_trawler_process {
     my $n_info = $netinfo_obj->netinfo;
     undef $netinfo_obj;
 
-    ## preserve hash for later Network reconstruction, w/out chans:
+    ## cheating here a bit to save some memory ...
+    ## preserve hash for later Network reconstruction, w/out chans
+    ## then merge this server report's hashchans:
     $obj->{NetInfo}->{$network} = dclone($n_info);
-
-    ## cheat a bit, merge this run's hashchans:
     $n_info->{HashChans} = $s_info->{HashChans};
     
     $kernel->call( $_[SESSION], 'js_push_pending',
@@ -946,6 +946,8 @@ sub h_src {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($req, $resp) = @_[ARG0, ARG1];
   
+  ## Silly little undocumented proof-of-concept.
+  ## Won't do anything if --showsource wasn't specified.
   unless ($opts->{showsource}) {
     $kernel->yield( h_error_404 => $req, $resp );
     return

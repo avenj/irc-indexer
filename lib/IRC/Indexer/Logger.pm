@@ -87,6 +87,10 @@ IRC::Indexer::Logger - Simple interface to Log::Handler
 
     ## Typically 'debug', 'info', 'warn':
     LogLevel => 'info',
+    
+    ## Enable DevNull to set up loggers yourself later
+    ## (Useful for only logging to STDOUT for example)
+    DevNull => 0,
   );
 
   ## Switch to a different file:
