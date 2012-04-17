@@ -53,7 +53,7 @@ sub worker {
             NetName     => $server,
             ServerName  => $server,
             ConnectedTo => $server,
-            FinishedAt  => gmtime(),
+            FinishedAt  => time,
             Status => 'FAIL', 
             Failure => $trawler->failed,
           };

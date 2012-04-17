@@ -96,7 +96,7 @@ sub done {
   
   if ($finished) {
     $self->report->status('DONE');
-    $self->report->finishedat(gmtime());
+    $self->report->finishedat(time);
 
     if (my $postback = delete $self->{POST}) {
       ## Send ourself in a postback.
@@ -121,7 +121,7 @@ sub failed {
     }
     $self->report->status('FAIL');
     $self->report->failed($reason);
-    $self->report->finishedat(gmtime());
+    $self->report->finishedat(time);
     
     if (my $postback = delete $self->{POST}) {
       $postback->($self);

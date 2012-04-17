@@ -107,7 +107,7 @@ sub run {
   
   $self->{sessid} = $sess->ID;
 
-  $self->{Serv}->startedat( gmtime() );
+  $self->{Serv}->startedat( time() );
   
   return $self
 }
@@ -140,7 +140,7 @@ sub failed {
     carp "Trawl run failed: $reason" if $self->verbose;
     $self->report->status('FAIL');
     $self->report->failed($reason);
-    $self->report->finishedat(gmtime());
+    $self->report->finishedat(time);
   } else {
     return unless defined $self->report->status 
            and $self->report->status eq 'FAIL';
@@ -155,7 +155,7 @@ sub done {
     carp "Trawler completed: ".$self->report->connectedto
       if $self->verbose;
     $self->report->status('DONE');
-    $self->report->finishedat(gmtime());
+    $self->report->finishedat(time());
   }
 
   return unless ref $self->report;  
@@ -328,7 +328,7 @@ sub irc_connected {
   ## report connected status; irc_001 handles the rest
   my $report = $self->report;
   $report->status('INIT');
-  $report->connectedat(gmtime());
+  $report->connectedat(time());
 }
 
 sub irc_disconnected {

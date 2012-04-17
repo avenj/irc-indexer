@@ -74,7 +74,7 @@ FETCH: {
     my $netinfo = decode_json($json);
     
     my $user_count = $netinfo->{GlobalUsers} // 0;
-    my $t = gmtime->hms;
+    my $t = localtime->hms;
     my $time = join ':', (split /:/, $t)[0,1];
   
     push(@{ $graphset->[0] }, $time);
