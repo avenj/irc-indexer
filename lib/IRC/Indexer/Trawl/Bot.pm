@@ -416,7 +416,7 @@ sub irc_251 {
   my @chunks = split ' ', $rawline;
   my($users, $i);
   while (my $chunk = shift @chunks) {
-    if ($chunk =~ /\d+/) {
+    if ($chunk =~ /^[0-9]+$/) {
       $users += $chunk;
       last if ++$i == 2;
     }
@@ -429,7 +429,7 @@ sub irc_252 {
   my ($self) = $_[OBJECT];
   my $report = $self->report;
   my $rawline = $_[ARG1];
-  my ($count) = $rawline =~ /^(\d+)/;
+  my ($count) = $rawline =~ /^([0-9]+)/;
   $report->opers($count||0);
 }
 
