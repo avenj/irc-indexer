@@ -85,10 +85,34 @@ B<You wouldn't normally use this module directly> unless you are writing
 an output subclass; instead, you would use a subclass for a particular 
 format, such as L<IRC::Indexer::Output::JSON>.
 
-=head1 API
+=head1 METHODS
+
+=head2 new
+
+Create an output encoder; the reference to serialize must be specified:
+
+  my $out = IRC::Indexer::Output::JSON->new(
+    Input => $ref,
+  );
+
+=head2 dump
+
+Return the serialized output as a scalar.
+
+  my $json = $out->dump;
+
+=head2 write
+
+Write serialized output to a file path or an opened FH.
+
+  $out->write($path);
+
+Will croak() on error.
+
+=head1 WRITING SUBCLASSES
 
 When writing an output subclass, you will need to override the methods 
-B<dump()> and B<write()> to set a proper Output scalar:
+B<dump()> and B<write()> to set a proper Output:
 
   our @ISA = qw/IRC::Indexer::Output/;
   
