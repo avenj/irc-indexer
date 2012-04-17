@@ -169,6 +169,7 @@ my $ArrayConf = { };
 my $jsmemcache = { };
 
 sub get_nets {
+  ## Called out of either get_cfg() or a rehash.
   my $conf_obj = $obj->{Cfg};
 
   die "Configuration directive missing: NetworkDir\n"
@@ -179,7 +180,8 @@ sub get_nets {
 }
 
 sub get_cfg {
-  ## set up $cfg, networks, and logging
+  ## Set up $cfg, networks, and logging
+  ## Called out of start_indexer()
   
   die "No --config specified.\n" unless $opts->{config};
   
@@ -275,6 +277,7 @@ sub log_to {
 }
 
 sub poco_cfg_httpd {
+  ## Called out of _start
   $state->{htevents} = [ map { 'h_'.$_ } qw/
      error_404
      src
@@ -318,7 +321,8 @@ sub poco_cfg_httpd {
 }
 
 sub poco_init_session {
-  ## create 'indexerhttp' session
+  ## Create 'indexerhttp' session
+  ## Called out of start_indexer()
   POE::Session->create(
     package_states => [
       main => [ qw/
@@ -364,12 +368,51 @@ sub _start {
   log_to('session', 'info', 'Session started');
 
   ## init httpd
-  my @htstates = poco_cfg_httpd();
+  poco_cfg_httpd();
 
   $kernel->post( $_[SESSION], 'e_init_nets' );
   
   ## add states from $state->{htevents}
   $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};  
+}
+
+sub _stop {  
+  log_to('session', 'warn', "_stop received");
+  
+  ## Run some cleanup if needed.
+  
+  for my $pidof (keys %{ $obj->{workers_by_pid} }) {
+    my $wheel = delete $obj->{workers_by_pid}->{$pidof};
+    next unless ref $wheel;
+    my $wid   = $wheel->ID;
+    delete $obj->{workers_by_wid}->{$wid};
+    $wheel->kill(9);
+  }
+  
+  if ($state->{openDB}) {
+    for my $network (keys %{ $state->{openDB} }) {
+      db_close($network);
+    }
+  }
+
+  if ($state->{wrote_pid_file}) {
+    unlink($state->{wrote_pid_file})
+      or warn "could not clean up pidfile: $!";
+  }
+
+  ## HTTP server should pick up shutdown and clean up.
+  $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
+}
+
+sub session_sig_hup {
+  log_to('session', 'warn', 'SIGHUP, reloading');
+  $_[KERNEL]->sig_handled();
+  $_[KERNEL]->call( $_[SESSION], 'e_rehash');
+}
+
+sub session_sig_int {
+  warn "Exiting due to signal";
+  $_[KERNEL]->yield('_stop');
 }
 
 sub e_init_nets {
@@ -450,46 +493,6 @@ sub e_rehash {
 
   ## Re-initialize runs right now.
   $kernel->call( $_[SESSION], 'e_init_nets');
-}
-
-sub session_sig_hup {
-  log_to('session', 'warn', 'SIGHUP, reloading');
-  $_[KERNEL]->sig_handled();
-  $_[KERNEL]->call( $_[SESSION], 'e_rehash');
-}
-
-sub session_sig_int {
-  warn "Exiting due to signal";
-  $_[KERNEL]->yield('_stop');
-}
-
-
-sub _stop {  
-  log_to('session', 'warn', "_stop received");
-  
-  ## Run some cleanup if needed.
-  
-  for my $pidof (keys %{ $obj->{workers_by_pid} }) {
-    my $wheel = delete $obj->{workers_by_pid}->{$pidof};
-    next unless ref $wheel;
-    my $wid   = $wheel->ID;
-    delete $obj->{workers_by_wid}->{$wid};
-    $wheel->kill(9);
-  }
-  
-  if ($state->{openDB}) {
-    for my $network (keys %{ $state->{openDB} }) {
-      db_close($network);
-    }
-  }
-
-  if ($state->{wrote_pid_file}) {
-    unlink($state->{wrote_pid_file})
-      or warn "could not clean up pidfile: $!";
-  }
-
-  ## HTTP server should pick up shutdown and clean up.
-  $_[KERNEL]->signal( $_[KERNEL], 'shutdown' );
 }
 
 sub e_timer_chk {
