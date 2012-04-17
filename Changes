@@ -1,5 +1,14 @@
 Changes for IRC::Indexer
 
+0.05 **********
+
+ ircindexer-server-json:
+   - TrawlInterval configurable, override via --interval
+   - PidFile configurable, override via --pidfile
+ 
+ IRC::Indexer::Conf:
+   - Support writing to open FH in write_example_cf()
+
 0.04 2012-04-16
 
  - Allow parsing confs from previously-opened file handles.
