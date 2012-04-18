@@ -2,6 +2,11 @@ Changes for IRC::Indexer
 
 0.05 **********
 
+ IRC::Indexer::Trawl::Multi:
+   - Removed.
+     Never very well-tested, throws inconsistent test failures on *BSD, 
+     very braindead.
+
  ircindexer-server-json:
    - TrawlInterval configurable, override via --interval
    - PidFile configurable, override via --pidfile
