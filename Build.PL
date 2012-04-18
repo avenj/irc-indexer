@@ -23,9 +23,11 @@ my $build = Module::Build->new(
   
   requires => {
     'perl' => '5.10.1',
-    
+
+    'Config'       => 0,   
     'Carp'         => 0,
     'POSIX'        => 0,
+    'Fcntl'        => 0,
     'Getopt::Long' => 0,
     'Scalar::Util' => 0,
     'Digest::SHA'  => 0,

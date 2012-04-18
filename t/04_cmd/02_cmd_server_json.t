@@ -8,4 +8,4 @@ my $cmd = new_ok( 'Test::Cmd' => [
  ],
 );
 
-is( $cmd->run(args => '-h'), 0, 'server-json exit 0' );
+is( $cmd->run(args => '--help'), 0, 'server-json exit 0' );
