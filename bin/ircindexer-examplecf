@@ -22,7 +22,7 @@ GetOptions(
       
       " -t, --type=TYPE\n",
       "       Type of config to output.\n",
-      "       One of: httpd, spec, multi\n\n",
+      "       One of: httpd, spec\n\n",
     
     );
     exit 0

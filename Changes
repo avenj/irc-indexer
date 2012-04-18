@@ -1,11 +1,7 @@
 Changes for IRC::Indexer
 
-0.05 **********
 
- IRC::Indexer::Trawl::Multi:
-   - Removed.
-     Never very well-tested, throws inconsistent test failures on *BSD, 
-     very braindead.
+0.05 2012-04-17
 
  ircindexer-server-json:
    - TrawlInterval configurable, override via --interval
@@ -13,6 +9,12 @@ Changes for IRC::Indexer
  
  IRC::Indexer::Conf:
    - Support writing to open FH in write_example_cf()
+
+ IRC::Indexer::Trawl::Multi:
+   - Removed.
+     Never very well-tested, throws inconsistent test failures on *BSD, 
+     very braindead.
+
 
 0.04 2012-04-16
 
@@ -23,6 +25,7 @@ Changes for IRC::Indexer
  - t/01_load/ :
    01_loadable,t; Deprecated, deleted
    04_helpers.t; Test IRC::Indexer::Conf & ::Logger properly
+
 
 0.03 2012-04-15
 
@@ -39,6 +42,7 @@ Changes for IRC::Indexer
  - t/ expanded; Add Test::Cmd tests, improve others.
    Add Trawl::Multi test.
 
+
 0.02 2012-04-15
 
  - Add missing test t/03_runnable.t
@@ -49,6 +53,7 @@ Changes for IRC::Indexer
  - server-json; log message typo
 
  - Significant POD updates/cleanups
+
 
 0.01 2012-04-14
 
