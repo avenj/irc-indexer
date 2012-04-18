@@ -17,7 +17,7 @@ name: IRC-Indexer
 provides:
   IRC::Indexer:
     file: lib/IRC/Indexer.pm
-    version: 0.04
+    version: 0.05
   IRC::Indexer::Conf:
     file: lib/IRC/Indexer/Conf.pm
     version: 0
@@ -54,20 +54,19 @@ provides:
   IRC::Indexer::Trawl::Forking:
     file: lib/IRC/Indexer/Trawl/Forking.pm
     version: 0
-  IRC::Indexer::Trawl::Multi:
-    file: lib/IRC/Indexer/Trawl/Multi.pm
-    version: 0
 requires:
   Carp: 0
   Compress::Zlib: 0
+  Config: 0
   DB_File: 0
   Data::Dumper: 0
   Digest::SHA: 0
+  Fcntl: 0
   File::Find: 0
-  File::Path: 0
+  File::Path: 2.00
   File::Spec: 0
   Getopt::Long: 0
-  IRC::Utils: 0
+  IRC::Utils: 0.11
   JSON::XS: 0
   Log::Handler: 0
   POE: 1.311
@@ -82,4 +81,4 @@ requires:
   perl: v5.10.1
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.04
+version: 0.05
