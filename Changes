@@ -1,6 +1,13 @@
 Changes for IRC::Indexer
 
 
+0.06 2012-04-17
+
+ Fix glaringly obvious test failure.
+ Didn't come up here since Multi.pm was still present.
+ Yes, I'm an idiot.
+
+ 
 0.05 2012-04-17
 
  ircindexer-server-json:
