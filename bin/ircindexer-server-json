@@ -122,12 +122,15 @@ my $state = {
     TotalNetworks => 0,
     TotalServers  => 0,
     
-    TrawlersExecuted => 0,
-    TrawlersCreated  => 0,
-    
-    LastTrawl         => 0,
-    LastTrawledServer => undef,
-    LastTrawlerReaped => undef,
+    Trawlers => { 
+      Executed => 0, 
+      Created  => 0,
+      Last => {
+        IssuedAt  => 0,
+        IssuedFor => undef,
+        Reaped    => undef,
+      },
+    },
     
     HTTP_Responses   => 0,
   },
@@ -601,9 +604,9 @@ sub e_trawler_run {
   ## Add to active trawlers for this network
   $obj->{active_trawlers}->{$network} = $trawler;
 
-  ++$state->{stats}->{TrawlersExecuted};
-  $state->{stats}->{LastTrawl} = time;
-  $state->{stats}->{LastTrawledServer} = $server;
+  ++$state->{stats}->{Trawlers}->{Executed};
+  $state->{stats}->{Trawlers}->{Last}->{IssuedAt}  = time;
+  $state->{stats}->{Trawlers}->{Last}->{IssuedFor} = $server;
 }
 
 sub e_trawler_process {
@@ -614,7 +617,7 @@ sub e_trawler_process {
 
   my $orig_server = $trawler->trawler_for;
   log_to('irc', 'debug', "Processing trawler: $network: $orig_server");
-  $state->{stats}->{LastTrawlerReaped} = $network;
+  $state->{stats}->{Trawlers}->{Last}->{Reaped} = $network;
 
   if (my $err = $trawler->failed) {
     log_to('irc', 'warn',
@@ -704,7 +707,7 @@ sub create_trawler {
     UseIPV6  => $this_cf->{UseIPV6},
   );
   
-  ++$state->{stats}->{TrawlersCreated};
+  ++$state->{stats}->{Trawlers}->{Created};
   
   return $trawler
 }
@@ -761,13 +764,13 @@ sub db_open {
   }
 
   $state->{openDB}->{$network} = \%this_cache;
-  ++$state->{stats}->{DB}->{Open};
+  ++$state->{stats}->{DB}->{DB_Open};
 }
 
 sub db_write {
   my ($data, $network, $server) = @_;
 
-  ++$state->{stats}->{DB}->{Write};
+  ++$state->{stats}->{DB}->{DB_Write};
   
   my $opendb = $state->{openDB}->{$network};
   
@@ -786,7 +789,7 @@ sub db_write {
 sub db_read {
   my ($network, $server) = @_;
 
-  ++$state->{stats}->{DB}->{Read};
+  ++$state->{stats}->{DB}->{DB_Read};
 
   my $opendb = $state->{openDB}->{$network};
 
@@ -806,7 +809,7 @@ sub db_read {
 sub db_close {
   my ($network) = @_;
 
-  ++$state->{stats}->{DB}->{Close};
+  ++$state->{stats}->{DB}->{DB_Close};
   
   my $cachedir;
   die "db_close called but no CacheDir configured"
@@ -831,7 +834,7 @@ sub db_close {
 sub db_unlink {
   my ($network) = @_;
   
-  ++$state->{stats}->{DB}->{Unlink};
+  ++$state->{stats}->{DB}->{DB_Unlink};
   
   my $cachedir;
   die "db_unlink called but no CacheDir configured"
@@ -861,11 +864,12 @@ sub cachedir_write {
   
   my $interval = tv_interval($timer0);
 
-  $state->{stats}->{DB}->{'WR_Total'}  += (sprintf("%.6f", $interval)+0);
+  my $total = $state->{stats}->{DB}->{'WR_Total'}  + $interval;
+  $state->{stats}->{DB}->{'WR_Total'} = sprintf("%.6f", $total) + 0;
   $state->{stats}->{DB}->{'WR_Longest'} = $interval
     if $interval > ($state->{stats}->{DB}->{'WR_Longest'}//0);
 
-  my $runs = $state->{stats}->{DB}->{Write} // 1;
+  my $runs = $state->{stats}->{DB}->{DB_Write} // 1;
   my $avg  = $state->{stats}->{DB}->{'WR_Total'} / $runs;
   
   $state->{stats}->{DB}->{'WR_Avg'} = sprintf("%.6f", $avg) + 0;
@@ -890,11 +894,12 @@ sub cachedir_read {
   
   my $interval = tv_interval($timer0);
 
-  $state->{stats}->{DB}->{'RD_Total'}  += (sprintf("%.6f", $interval)+0);
+  my $total = $state->{stats}->{DB}->{'WR_Total'}  + $interval;
+  $state->{stats}->{DB}->{'WR_Total'} = sprintf("%.6f", $total) + 0;
   $state->{stats}->{DB}->{'RD_Longest'} = $interval
     if $interval > ($state->{stats}->{DB}->{'RD_Longest'}//0);
 
-  my $read = $state->{stats}->{DB}->{Read} // 1;
+  my $read = $state->{stats}->{DB}->{DB_Read} // 1;
   my $avg  = $state->{stats}->{DB}->{'RD_Total'} / $read;
   
   $state->{stats}->{DB}->{'RD_Avg'} = sprintf("%.6f", $avg) + 0;
@@ -1027,7 +1032,7 @@ sub h_stats {
   } else {
     my @pending = keys %{ $obj->{active_trawlers} };
     my $ref = { ActiveTrawlers => \@pending, %{$state->{stats}} };
-    my $json = JSON::XS->new->utf8(1)->pretty->encode($ref);
+    my $json = JSON::XS->new->utf8(1)->pretty->canonical->encode($ref);
     $resp->content_type('application/json');
     $resp->content($json);
   }
