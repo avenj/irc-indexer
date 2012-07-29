@@ -1,5 +1,5 @@
 package IRC::Indexer;
-our $VERSION = '0.06';
+our $VERSION = '0.07_01';
 
 ## stub! for now ..
 
