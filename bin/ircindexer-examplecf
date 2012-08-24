@@ -38,7 +38,7 @@ GetOptions(
 $cftype = lc($cftype||'');
 
 die "Invalid --type\nShould be one of: httpd, spec\n"
-  unless $cftype and $cftype ~~ [qw/httpd spec/];
+  unless $cftype and grep { $_ eq $cftype } qw/httpd spec/;
 
 if ($show) {
   print IRC::Indexer::Conf->get_example_cf($cftype);
