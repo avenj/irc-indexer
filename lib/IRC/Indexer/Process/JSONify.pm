@@ -39,7 +39,7 @@ sub worker {
           unless ref $hash eq 'HASH';
 
         my $jsify = IRC::Indexer::Output::JSON->new(
-          Input => $hash,
+          input => $hash,
         );
         
         my $json = $jsify->dump;

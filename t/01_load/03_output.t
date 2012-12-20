@@ -14,6 +14,6 @@ BEGIN {
 }
 
 for my $class (@classes) {
-  my $obj = new_ok( $class => [ Input => {} ] );
+  my $obj = new_ok( $class => [ input => {} ] );
   can_ok( $obj, qw/dump write/);
 }

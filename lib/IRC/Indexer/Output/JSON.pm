@@ -23,7 +23,7 @@ around write => sub {
     )
   );
   $self->$orig(@_)
-}
+};
 
 
 1;

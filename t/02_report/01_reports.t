@@ -143,12 +143,12 @@ ok( $hashchans = $network->chanhash, 'network chanhash() get' );
 is_deeply( $hashchans, $expected_hashchans, 'network chanhash() compare' );
 
 my $server_json = new_ok( 'IRC::Indexer::Output::JSON' => 
-  [ Input => $server->netinfo ]
+  [ input => $server->netinfo ]
 );
 ok( $server_json->dump, 'JSONify server hash' );
 
 my $net_json = new_ok( 'IRC::Indexer::Output::JSON' =>
-  [ Input => $network->info ]
+  [ input => $network->info ]
 );
 ok( $net_json->dump, 'JSONify network hash' );
 

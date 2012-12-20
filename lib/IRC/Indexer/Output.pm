@@ -23,6 +23,12 @@ has output => (
   default   => sub { '' },
 );
 
+sub BUILDARGS {
+  my ($class, %args) = @_;
+  $args{lc $_} = delete $args{$_} for keys %args;
+  +{%args}
+}
+
 sub dump {
   my ($self) = @_;
   $self->output
@@ -67,7 +73,7 @@ IRC::Indexer::Output - Turn trawler output into something useful
   
   ## Convert trawler output into JSON, for example:
   my $output = IRC::Indexer::Output::JSON->new(
-    Input => $trawler->dump,
+    input => $trawler->dump,
   );
   
   ## Get output as a scalar:
@@ -92,7 +98,7 @@ format, such as L<IRC::Indexer::Output::JSON>.
 Create an output encoder; the reference to serialize must be specified:
 
   my $out = IRC::Indexer::Output::JSON->new(
-    Input => $ref,
+    input => $ref,
   );
 
 =head2 dump
@@ -108,28 +114,6 @@ Write serialized output to a file path or an opened FH.
   $out->write($path);
 
 Will confess() on error.
-
-=head1 WRITING SUBCLASSES
-
-When writing an output subclass, you will need to override the methods 
-B<dump()> and B<write()> to set a proper Output:
-
-  our @ISA = qw/IRC::Indexer::Output/;
-  
-  sub dump {
-    my ($self) = @_;
-    my $input = $self->{Input};
-    ## Serialize the $input hashref any way you like:
-    $self->{Output} = frobulate_my_input($input);
-    $self->SUPER::dump();
-  }
-  
-  sub write {
-    my ($self, $path) = @_;
-    my $input = $self->{Input};
-    $self->{Output} = frobulate_my_input($input);
-    $self->SUPER::write($path);
-  }
 
 =head1 AUTHOR
 
