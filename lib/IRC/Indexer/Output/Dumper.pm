@@ -1,26 +1,21 @@
 package IRC::Indexer::Output::Dumper;
 
-use strict;
-use warnings;
-
+use Moo;
 use Data::Dumper;
 
-require IRC::Indexer::Output;
-our @ISA = qw/IRC::Indexer::Output/;
+extends 'IRC::Indexer::Output';
 
-sub dump {
-  my ($self) = @_;
-  my $input = $self->{Input};
-  $self->{Output} = Dumper($input);
-  $self->SUPER::dump();
-}
+around dump => sub {
+  my ($orig, $self) = @_;
+  $self->output( Dumper($self->input) );
+  $self->$orig
+};
 
-sub write {
-  my ($self, $path) = @_;  
-  my $input = $self->{Input};
-  $self->{Output} = Dumper($input);
-  $self->SUPER::write($path);
-}
+around write => sub {
+  my ($orig, $self) = splice @_, 0, 2;
+  $self->output( Dumper($self->input) );
+  $self->$orig(@_)
+};
 
 1;
 __END__

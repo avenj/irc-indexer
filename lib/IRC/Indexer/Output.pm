@@ -1,50 +1,50 @@
 package IRC::Indexer::Output;
 
 use 5.10.1;
-use strict;
-use warnings;
-use Carp;
+use Carp 'confess';
+use Scalar::Util 'openhandle';
 
-use Scalar::Util qw/openhandle/;
+use Moo;
 
-sub new {
-  my $class = shift;
-  my $self  = {};
-  bless $self, $class;
+has input => (
+  is        => 'ro',
+  required  => 1,
+  isa       => sub {
+    defined $_[0] or confess "input() not defined"
+  },
+);
 
-  my %args = @_;
-  
-  $args{lc $_} = delete $args{$_} for keys %args;
-  
-  $self->{Input} = delete $args{input} 
-    || croak "No input specified in new" ;
-
-  return $self
-}
+has output => (
+  is        => 'rw',
+  lazy      => 1,
+  isa       => sub {
+    defined $_[0] or confess "output() not defined"
+  },
+  default   => sub { '' },
+);
 
 sub dump {
   my ($self) = @_;
-  my $output = $self->{Output};
-  return $output
+  $self->output
 }
 
 sub write {
   my ($self, $path) = @_;
   
   unless ($path) {
-    croak "write() called but no path specified" ;
+    confess "write() called but no path specified" ;
   }
   
   my $out;
-  unless ($out = $self->{Output}) {
-    croak "write() called but no Output to write" ;
+  unless ($out = $self->output) {
+    confess "write() called but no Output to write" ;
   }
 
   if ( openhandle($path) ) {
     print $path $out;
   } else {
     open my $fh, '>:encoding(utf8)', $path 
-      or croak "open failed in write(): $!";
+      or confess "open failed in write(): $!";
     print $fh $out;
     close $fh;
   }
@@ -107,7 +107,7 @@ Write serialized output to a file path or an opened FH.
 
   $out->write($path);
 
-Will croak() on error.
+Will confess() on error.
 
 =head1 WRITING SUBCLASSES
 

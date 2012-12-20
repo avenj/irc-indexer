@@ -1,25 +1,22 @@
 package IRC::Indexer::Output::YAML;
 
-use strict;
-use warnings;
+use Moo;
 use YAML::XS ();
 
-require IRC::Indexer::Output;
-our @ISA = qw/IRC::Indexer::Output/;
+extends 'IRC::Indexer::Output';
 
-sub dump {
-  my ($self, $path) = @_;
-  my $input = $self->{Input};
-  $self->{Output} = YAML::XS::Dump($input);
-  $self->SUPER::dump();
-}
+around dump => sub {
+  my ($orig, $self) = @_;
+  $self->output( YAML::XS::Dump($self->input) );
+  $self->$orig
+};
 
-sub write {
-  my ($self, $path) = @_;
-  my $input = $self->{Input};
-  $self->{Output} = YAML::XS::Dump($input);
-  $self->SUPER::write($path);
-}
+around write => sub {
+  my ($orig, $self) = splice @_, 0, 2;
+  $self->output( YAML::XS::Dump($self->input) );
+  $self->$orig(@_)
+};
+
 
 1;
 __END__

@@ -1,29 +1,30 @@
 package IRC::Indexer::Output::JSON;
 
-use strict;
-use warnings;
+use Moo;
 use JSON::XS;
 
-require IRC::Indexer::Output;
-our @ISA = qw/IRC::Indexer::Output/;
+extends 'IRC::Indexer::Output';
 
-sub dump {
-  my ($self) = @_;
-  $self->{Output} = JSON::XS->new->utf8(1)->indent->encode(
-    $self->{Input}
+around dump => sub {
+  my ($orig, $self) = @_;
+  $self->output( 
+    JSON::XS->new->utf8(1)->indent->encode(
+      $self->input
+    )
   );
-  $self->SUPER::dump();
+  $self->$orig
+};
+
+around write => sub {
+  my ($orig, $self) = splice @_, 0, 2;
+  $self->output(
+    JSON::XS->new->utf8(1)->indent->encode(
+      $self->input
+    )
+  );
+  $self->$orig(@_)
 }
 
-sub write {
-  my ($self, $path) = @_;
-  
-  $self->{Output} = JSON::XS->new->utf8(1)->indent->encode(
-    $self->{Input}
-  ) . "\n" ;
-
-  $self->SUPER::write($path);
-}
 
 1;
 __END__
