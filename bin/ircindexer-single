@@ -21,39 +21,39 @@ GetOptions(
   'help' => sub {
     print(
       "ircindexer-single help\n\n",
-      
+
       "  -s, --server=SERVER\n",
       "      Destination server.\n\n",
-      
+
       "  -p, --port=PORT\n",
       "      Destination port [6667]\n\n",
-      
+
       "  -f, --format=FORMAT\n",
       "      One of: JSON, YAML, Dumper\n\n",
-      
+
       "  -t, --timeout=SECS\n",
       "      IRC session timeout in seconds.\n\n",
-      
+
       "  -i, --interval=SECS\n",
       "      Interval between IRC requests in seconds.\n\n",
-      
+
       "  -o, --output=PATH\n",
       "      File to write output to (rather than STDOUT)\n",
     );
-    
+
     exit 0
   },
-  
+
   'verbose:0'  => \$verbose,
 
   'server=s' => \$server,
   'port:6667' => \$port,
-  
+
   'timeout:90'  => \$timeout,
   'interval:15' => \$interval,
-  
+
   'format|export=s' => \$fmt,
-  
+
   'output=s'   => \$outpath,
 );
 
@@ -73,7 +73,7 @@ POE::Session->create(
         interval => $interval,
       );
     },
-    
+
     trawler_done => sub {
       ## Should have gotten the trawler obj.
       ## ARG1 will be an arrayref.
@@ -81,7 +81,7 @@ POE::Session->create(
       if ($trawl->failed) {
         die "Trawler failed: ".$trawl->failed
       }
-    
+
       my $info = $trawl->info;
       $info->channels; ## builds sorted chan list
       my $ref = $trawl->dump;
@@ -95,20 +95,20 @@ POE::Session->create(
             Input => $ref,
           );
         }
-        
+
         when ("YAML") {
           $output = IRC::Indexer::Output::YAML->new(
             Input => $ref,
           );
         }
-        
+
         default {
           $output = IRC::Indexer::Output::Dumper->new(
             Input => $ref,
           );
         }
       }
-      
+
       if ($outpath) {
         warn "Writing: $outpath\n";
         $output->write($outpath);
@@ -117,7 +117,7 @@ POE::Session->create(
       }
 
     },
-    
+
   }, ## inline_states
 );
 

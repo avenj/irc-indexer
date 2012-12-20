@@ -42,24 +42,24 @@ my $opts = {
   help => sub {
     print(
       "ircindexer-server-json\n\n",
-      
+
       "  -v, --version\n",
       "       Display IRC::Indexer version\n\n",
-      
+
       "  -c, --config=PATH\n",
       "       Configuration file for this server.\n\n",
-      
+
       "  -d, --detach\n",
       "       Run as a daemon process.\n\n",
-      
+
       "  -p, --pidfile\n",
       "       Write our PID to the specified path.\n",
       "       Overrides configuration file.\n\n",
 
       "  -l, --loglevel=LEVEL\n",
       "       Log verbosity, one of: debug, info, warn\n",
-      "       Overrides configuration file.\n\n",      
-      
+      "       Overrides configuration file.\n\n",
+
       "  -i, --interval=SECS\n",
       "       Interval between trawling servers on a specific network.\n",
       "       Overrides configuration file.\n",
@@ -67,7 +67,7 @@ my $opts = {
     );
     exit 0
   },
-  
+
   version => sub {
     print(
       "ircindexer-server-json (IRC::Indexer $IRC::Indexer::VERSION)\n",
@@ -75,7 +75,7 @@ my $opts = {
     );
     exit 0
   },
-  
+
   detach => 0,
 
   interval => 600,
@@ -84,19 +84,19 @@ my $opts = {
 use Getopt::Long;
 GetOptions( $opts,
   qw/
-    help 
+    help
     version
-    
+
     config=s
-    
+
     detach!
-    
+
     pidfile=s
 
     loglevel=s
 
-    interval=i   
-    
+    interval=i
+
     showsource
   /,
 );
@@ -104,7 +104,7 @@ GetOptions( $opts,
 my $obj = {
   Log    => undef,
   Cfg    => undef,
-  active_trawlers => {},  
+  active_trawlers => {},
   workers_by_pid => {},
   workers_by_wid => {},
 };
@@ -116,14 +116,14 @@ my $state = {
     RunID => sha1_hex(Time::HiRes::time() . rand),
     Version => $IRC::Indexer::VERSION,
     StartedAt => time,
-    
+
     LoopTick      => 0,
-    
+
     TotalNetworks => 0,
     TotalServers  => 0,
-    
-    Trawlers => { 
-      Executed => 0, 
+
+    Trawlers => {
+      Executed => 0,
       Created  => 0,
       Last => {
         IssuedAt  => 0,
@@ -131,19 +131,19 @@ my $state = {
         Reaped    => undef,
       },
     },
-    
+
     HTTP_Responses   => 0,
   },
 };
 
-my $cfg = { 
+my $cfg = {
   ## Defaults.
   ## These will be pulled from our httpd.conf in get_cfg.
   NetworkDir => undef,
   BindAddr   => '0.0.0.0',
   ServerPort => 8700,
   ListChans  => undef,
-  
+
   CacheDir   => undef,
   PidFile    => undef,
 
@@ -152,7 +152,7 @@ my $cfg = {
   Forking => 0,
   MaxEncoders => 20,
   MaxTrawlers => 20,
-  
+
   LogFile  => undef,
   LogLevel => undef,
   LogHTTP  => 1,
@@ -185,35 +185,35 @@ sub get_nets {
 sub get_cfg {
   ## Set up $cfg, networks, and logging
   ## Called out of start_indexer()
-  
+
   die "No --config specified.\n" unless $opts->{config};
-  
+
   die "Specified conf nonexistant: $opts->{config}"
     unless -e $opts->{config};
 
   die "Specified conf not readable: $opts->{config}"
     unless -r $opts->{config};
 
-  ## Try to set up primary conf: 
+  ## Try to set up primary conf:
   my $cfpath = $opts->{config};
   my $conf = IRC::Indexer::Conf->new;
   $obj->{Cfg} = $conf;
   my $cfhash;
-  
+
   {
     local $@;
     eval { $cfhash = $conf->parse_conf($cfpath) };
     die "Could not parse conf: $@" if $@;
   }
 
-  ## Only copies our defined params, see $cfg      
+  ## Only copies our defined params, see $cfg
   for my $thisopt (keys %$cfg) {
     $cfg->{$thisopt} = $cfhash->{$thisopt};
   }
 
   ## Set up logging:
   my $loglevel = $opts->{loglevel} || $cfg->{LogLevel} || 'info' ;
-    
+
   if ($cfg->{LogFile}) {
     my $handler = IRC::Indexer::Logger->new(
       LogFile  => $cfg->{LogFile},
@@ -221,7 +221,7 @@ sub get_cfg {
     );
     $obj->{Log} = $handler->logger;
   }
-  
+
   if ($opts->{detach}) {
     open 'STDERR', '>', $cfg->{LogFile}
       if $cfg->{LogFile};
@@ -242,10 +242,10 @@ sub get_cfg {
       },
     );
   }
-  
+
   $cfg->{ServerPort} //= 8700;
 
-  ## Read server specifications:  
+  ## Read server specifications:
   get_nets();
 }
 
@@ -258,24 +258,24 @@ sub log_to {
   return unless @lines;
   my $log = $obj->{Log};
   return unless blessed $log;
-  
+
   given (lc $type) {
-  
+
     when ("http") {
       return unless $cfg->{LogHTTP};
       $log->$level("$type ", @lines);
     }
-    
+
     when ("irc") {
       return unless $cfg->{LogIRC};
       $log->$level("$type ", @lines);
     }
-    
+
     default {
       ## anything else goes right to the log:
       $log->$level("$type ", @lines);
     }
-  
+
   }
 }
 
@@ -286,7 +286,7 @@ sub poco_cfg_httpd {
      src
      stats
      list
-     server 
+     server
      servlist
      network
      netlist
@@ -300,26 +300,26 @@ sub poco_cfg_httpd {
       LocalAddr => $cfg->{BindAddr},
       LocalPort => $cfg->{ServerPort},
     },
-    
+
     handlers => [
       '^/$'       => 'poe:indexerhttp/h_stats',
       '^/stats'   => 'poe:indexerhttp/h_stats',
-       
+
       '^/list'    => 'poe:indexerhttp/h_list',
-       
+
       '^/network' => 'poe:indexerhttp/h_network',
       '^/netlist' => 'poe:indexerhttp/h_netlist',
-      
+
       '^/src'     => 'poe:indexerhttp/h_src',
-      
+
       '' => 'poe:indexerhttp/h_error_404',
-      
+
       'post_request' => 'poe:indexerhttp/post_request',
     ],
   );
-  
+
   log_to('http', 'info', 'HTTP configured');
-  
+
   return 1
 }
 
@@ -341,14 +341,14 @@ sub poco_init_session {
         e_timer_chk
         e_trawler_run
         e_trawler_process
-        
-        js_push_pending        
+
+        js_push_pending
         js_worker_stdout
         js_worker_stderr
         js_worker_error
         js_worker_closed
         js_worker_sigchld
-        
+
       / ],
     ],
   );
@@ -363,7 +363,7 @@ sub poco_init_session {
 sub _start {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   $kernel->alias_set('indexerhttp');
-  
+
   $kernel->sig('INT', 'session_sig_int');
   $kernel->sig('TERM', 'session_sig_int');
   $kernel->sig('HUP', 'session_sig_hup');
@@ -374,16 +374,16 @@ sub _start {
   poco_cfg_httpd();
 
   $kernel->post( $_[SESSION], 'e_init_nets' );
-  
+
   ## add states from $state->{htevents}
-  $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};  
+  $kernel->state($_, __PACKAGE__) for @{$state->{htevents}};
 }
 
-sub _stop {  
+sub _stop {
   log_to('session', 'warn', "_stop received");
-  
+
   ## Run some cleanup if needed.
-  
+
   for my $pidof (keys %{ $obj->{workers_by_pid} }) {
     my $wheel = delete $obj->{workers_by_pid}->{$pidof};
     next unless ref $wheel;
@@ -391,7 +391,7 @@ sub _stop {
     delete $obj->{workers_by_wid}->{$wid};
     $wheel->kill(9);
   }
-  
+
   if ($state->{openDB}) {
     for my $network (keys %{ $state->{openDB} }) {
       db_close($network);
@@ -422,7 +422,7 @@ sub e_init_nets {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
 
   ## Called by _start & rehash.
-  
+
   ## clear configured trawlers in $ArrayConf
   $ArrayConf = { };
 
@@ -433,27 +433,27 @@ sub e_init_nets {
     SERVER: for my $server (keys %$this_net) {
       ++$total_servers;
       my $this_cf = $this_net->{$server};
-      
+
       log_to('irc', 'info', "Init trawler: $network -> $server");
 
       ## Push configuration to array
       ## we'll create_trawler() in e_trawler_run
       my %trawlopts = %$this_cf;
-      push(@{$ArrayConf->{$network}}, 
+      push(@{$ArrayConf->{$network}},
         [ $network, $server, { Server => $server, %trawlopts } ]
       );
-      
+
       log_to('irc', 'debug', "Trawler configured for $server");
     } ## SERVER
-          
+
   } ## NETWORK
-    
+
   log_to('irc', 'info',
     "Trawling $total_servers servers across $total_nets networks"
   );
 
   $state->{stats}->{TotalNetworks} = $total_nets;
-  $state->{stats}->{TotalServers}  = $total_servers;  
+  $state->{stats}->{TotalServers}  = $total_servers;
 
   ## Reset our HasRun.
   ## This may be a rehash.
@@ -467,15 +467,15 @@ sub e_rehash {
 
   ## Suspend our check loop, e_init_nets will reset it.
   $kernel->alarm('e_timer_chk');
-  
+
   ## Stop any running trawler runs.
   ## Running encoders for dead nets are automatically discarded.
   ## (You might bottleneck for a few if they're throttled hard, though.)
   NETWORK: for my $network (keys %{ $obj->{active_trawlers} }) {
     log_to('irc', 'debug', "Suspending trawler for $network");
-    
+
     my $trawler = delete $obj->{active_trawlers}->{$network};
-    
+
     ## If there's no Session ID, this trawler isn't running.
     my $sessid  = $trawler->ID // next NETWORK;
     $kernel->post( $sessid, 'shutdown' );
@@ -503,7 +503,7 @@ sub e_timer_chk {
   my $state_run = $state->{hasrun};
 
   ++$state->{stats}->{LoopTick};
-  
+
   my @trawlers;
 
   ## PID write is here so we can fail out properly if HTTPd can't start:
@@ -521,21 +521,21 @@ sub e_timer_chk {
 
   my $sp = 0;
   NETWORK: for my $network (keys %$ArrayConf) {
-    my $last_trawled = $state_run->{$network};    
+    my $last_trawled = $state_run->{$network};
     unless ($last_trawled) {
       ## No trawlers have been run for this network, yet.
       ## Spin one up, set HasRun time.
       $state_run->{$network} = time();
-      
+
       unless (@{ $ArrayConf->{$network} }) {
         log_to('irc', 'warn', "No trawlers to start for $network");
-        next NETWORK     
+        next NETWORK
       }
 
       ## Space out our initial runs.
       log_to('irc', 'debug', "Scheduling initial trawler for $network");
       $kernel->alarm_add( 'e_trawler_run', time + ($sp+=1),
-        $ArrayConf->{$network}->[0] 
+        $ArrayConf->{$network}->[0]
       );
     }
   } ## NETWORK
@@ -547,7 +547,7 @@ sub e_timer_chk {
       ## Rotate ArrayConf and schedule a new one.
       my $prev = shift @{ $ArrayConf->{$network} };
       push(@{ $ArrayConf->{$network} }, $prev );
-      
+
       $kernel->yield( 'e_trawler_process', $network, $trawler );
 
       ## Schedule the next one for this net to run in ten minutes.
@@ -558,7 +558,7 @@ sub e_timer_chk {
         $kernel->alarm_add(
           'e_trawler_run', $next_run_at, $next_trawler
         );
-        log_to('irc', 'debug', 
+        log_to('irc', 'debug',
           "Scheduling next trawler for $network"
         );
       } else {
@@ -581,7 +581,7 @@ sub e_trawler_run {
   unless (ref $confitem eq 'ARRAY' && $ArrayConf->{ $confitem->[0] }) {
     ## e_trawler_run was scheduled, but we lost the network in a rehash.
     ## this is a hack; we should be tracking/removing alarm_add IDs.
-    log_to('irc', 'debug', 
+    log_to('irc', 'debug',
       "skipped e_trawler_run for cancelled trawler"
     );
     return
@@ -596,11 +596,11 @@ sub e_trawler_run {
     $kernel->alarm_add( 'e_trawler_run', time + 1, $confitem );
     return
   }
-  
+
   my $trawler = create_trawler(%$trawlcf);
   $trawler->run();
   log_to('irc', 'info', "Trawler run: $network: $server");
-  
+
   ## Add to active trawlers for this network
   $obj->{active_trawlers}->{$network} = $trawler;
 
@@ -636,15 +636,15 @@ sub e_trawler_process {
     my $server = $info->servername;
     ++$state->{stats}->{Success}->{$network}->{$server};
 
-    log_to('irc', 'info', 
+    log_to('irc', 'info',
       "Completed trawler: $network ($server)"
     );
-    
+
     ## sort ListChans if configured:
     $info->channels if $cfg->{ListChans};
 
     my $s_info = $info->netinfo;
-  
+
     my $netinfo_obj;
     if ($obj->{NetInfo}->{$network}) {
       my $stored = $obj->{NetInfo}->{$network};
@@ -661,7 +661,7 @@ sub e_trawler_process {
     ## feed it this server's Info object:
     $netinfo_obj->add_server($info);
     undef $info;
-  
+
     ## process and grab new hash:
     my $n_info = $netinfo_obj->netinfo;
     undef $netinfo_obj;
@@ -671,12 +671,12 @@ sub e_trawler_process {
     ## then merge this server report's hashchans:
     $obj->{NetInfo}->{$network} = dclone($n_info);
     $n_info->{HashChans} = $s_info->{HashChans};
-    
+
     $kernel->call( $_[SESSION], 'js_push_pending',
       [ $n_info, $network ]
     );
-    undef $n_info;    
-    
+    undef $n_info;
+
     $kernel->call( $_[SESSION], 'js_push_pending',
       [ $s_info, $network, $server ],
     );
@@ -688,7 +688,7 @@ sub e_trawler_process {
 sub create_trawler {
   my %trawlopts = @_;
   my $this_cf = \%trawlopts;
-  
+
   my $trawler_class;
   if ($cfg->{Forking}) {
     $trawler_class = 'Trawl::Forking';
@@ -696,7 +696,7 @@ sub create_trawler {
     $trawler_class = 'Trawl::Bot';
   }
   $trawler_class = 'IRC::Indexer::'.$trawler_class;
-  
+
   my $trawler = $trawler_class->new(
     Server => $this_cf->{Server},
     Port   => $this_cf->{Port},
@@ -706,9 +706,9 @@ sub create_trawler {
     BindAddr => $this_cf->{BindAddr},
     UseIPV6  => $this_cf->{UseIPV6},
   );
-  
+
   ++$state->{stats}->{Trawlers}->{Created};
-  
+
   return $trawler
 }
 
@@ -739,7 +739,7 @@ sub db_open {
     $timer += 0.1;
   }
   print $lock_fh $$;
-  
+
   $state->{locks}->{$network} = $lock_fh;
 
   my %this_cache;
@@ -771,13 +771,13 @@ sub db_write {
   my ($data, $network, $server) = @_;
 
   ++$state->{stats}->{DB}->{DB_Write};
-  
+
   my $opendb = $state->{openDB}->{$network};
-  
+
   unless ($opendb && tied %$opendb) {
     die "Attempted db_write on unopened DB ($network)"
   }
-  
+
   if ($server) {
     $opendb->{$server} = $data;
   } else {
@@ -796,7 +796,7 @@ sub db_read {
   unless ($opendb && tied %$opendb) {
     die "Attempted db_read on unopened DB ($network)"
   }
-  
+
   my $data;
   if ($server) {
     $data = $opendb->{$server};
@@ -810,22 +810,22 @@ sub db_close {
   my ($network) = @_;
 
   ++$state->{stats}->{DB}->{DB_Close};
-  
+
   my $cachedir;
   die "db_close called but no CacheDir configured"
     unless $cachedir = $cfg->{CacheDir};
 
   my $dbpath = join '/', $cachedir, $network;
   my $lockpath = $dbpath . '.lock';
-  
+
   my $lock_fh  = delete $state->{locks}->{$network};
   my $opendb   = delete $state->{openDB}->{$network};
-  
+
   if ($lock_fh) {
     close $lock_fh;
     unlink $lockpath;
   }
-  
+
   if ($opendb) {
     untie %$opendb;
   }
@@ -833,15 +833,15 @@ sub db_close {
 
 sub db_unlink {
   my ($network) = @_;
-  
+
   ++$state->{stats}->{DB}->{DB_Unlink};
-  
+
   my $cachedir;
   die "db_unlink called but no CacheDir configured"
     unless $cachedir = $cfg->{CacheDir};
 
   my $dbpath = join '/', $cachedir, $network;
-  
+
   log_to('DB', 'debug', "db_unlink: $dbpath");
 
   ## Not sure if we should die() ...
@@ -857,11 +857,11 @@ sub cachedir_write {
     unless $cachedir = $cfg->{CacheDir};
 
   my $timer0 = [gettimeofday];
-  
+
   db_open($network, Raw => 1);
   db_write($zipped, $network, $server);
   db_close($network);
-  
+
   my $interval = tv_interval($timer0);
 
   my $total = $state->{stats}->{DB}->{'WR_Total'}  + $interval;
@@ -871,27 +871,27 @@ sub cachedir_write {
 
   my $runs = $state->{stats}->{DB}->{DB_Write} // 1;
   my $avg  = $state->{stats}->{DB}->{'WR_Total'} / $runs;
-  
+
   $state->{stats}->{DB}->{'WR_Avg'} = sprintf("%.6f", $avg) + 0;
-  
-  return 1 
+
+  return 1
 }
 
 sub cachedir_read {
   my ($gzipped, $network, $server) = @_;
   return unless $network;
   $gzipped = 0 if $gzipped eq 'json';
-  
+
   my $cachedir;
   die "cachedir_read called but no CacheDir configured"
     unless $cachedir = $cfg->{CacheDir};
 
   my $timer0 = [gettimeofday];
-  
+
   db_open($network, Raw => $gzipped);
   my $data = db_read($network, $server);
   db_close($network);
-  
+
   my $interval = tv_interval($timer0);
 
   my $total = $state->{stats}->{DB}->{'WR_Total'}  + $interval;
@@ -901,18 +901,18 @@ sub cachedir_read {
 
   my $read = $state->{stats}->{DB}->{DB_Read} // 1;
   my $avg  = $state->{stats}->{DB}->{'RD_Total'} / $read;
-  
+
   $state->{stats}->{DB}->{'RD_Avg'} = sprintf("%.6f", $avg) + 0;
-  
+
   return $data
 }
 
 sub cache_clear {
   my ($network) = @_;
   return unless $network;
-  
+
   log_to('DB', 'warn', "Clearing cache: $network");
-  
+
   if ($cfg->{CacheDir}) {
     db_unlink($network);
   } else {
@@ -943,7 +943,7 @@ sub cache_json {
 sub restore_cache {
   my ($gzipped, $network, $server) = @_;
   $gzipped = 0 if $gzipped eq 'json';
-  
+
   if ($server) {
 
     if ($cfg->{CacheDir}) {
@@ -962,7 +962,7 @@ sub restore_cache {
       return memGzip($cachedjs) if $cachedjs and $gzipped;
       return $cachedjs
     }
-  }  
+  }
 }
 
 ## HTTP states
@@ -970,14 +970,14 @@ sub restore_cache {
 sub h_error_404 {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($req, $resp, $reason) = @_[ARG0, ARG1, ARG2];
-    
+
   my $uri  = URI->new( $req->uri );
   my $path = $uri->path;
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
-  
+
   log_to('http', 'info', "$addr 404 $path");
-  
+
   $reason = "Undefined action: ".$req->uri unless $reason;
   $resp->error(404, $reason);
 }
@@ -985,7 +985,7 @@ sub h_error_404 {
 sub h_src {
   my ($kernel, $heap) = @_[KERNEL, HEAP];
   my ($req, $resp) = @_[ARG0, ARG1];
-  
+
   ## Silly little undocumented proof-of-concept.
   ## Won't do anything if --showsource wasn't specified.
   unless ($opts->{showsource}) {
@@ -1006,7 +1006,7 @@ sub h_src {
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_src");
-  
+
   $resp->done;
 }
 
@@ -1020,7 +1020,7 @@ sub h_stats {
 
   my ($method) = @chunks;
   $method = 'json' unless $method;
-  
+
   if ($method eq 'text' || $method eq 'plain') {
     my $n_count = $state->{stats}->{TotalNetworks};
     my $s_count = $state->{stats}->{TotalServers};
@@ -1042,7 +1042,7 @@ sub h_stats {
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_stats");
-  
+
   $resp->done;
 }
 
@@ -1056,7 +1056,7 @@ sub h_server {
   unless ( $zipped = restore_cache('zip', $network, $server) ) {
     ## no JSON for this server, 404
     my $reason;
-    
+
     if (defined $cfg->{Networks}->{$network}
         && defined $cfg->{Networks}->{$network}->{$server}
     ) {
@@ -1074,7 +1074,7 @@ sub h_server {
   if ($uri->query && $uri->query =~ /^gzip/i) {
     $resp->content_type('application/x-gzip');
     $resp->content($zipped);
-  } else {  
+  } else {
     my $json = memGunzip($zipped);
     undef $zipped;
     $resp->content_type('application/json');
@@ -1082,11 +1082,11 @@ sub h_server {
   }
 
   $resp->respond;
-  
+
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_server $network $server");
-  
+
   $resp->done;
 }
 
@@ -1101,16 +1101,16 @@ sub h_servlist {
     Input => $servlist,
   );
   my $json = $jsify->dump;
-  
+
   $resp->content_type('application/json');
   $resp->content($json);
-  
+
   $resp->respond;
 
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_servlist $network");
-  
+
   $resp->done;
 }
 
@@ -1129,7 +1129,7 @@ sub h_netlist {
     Input => $netlist,
   );
   my $json = $jsify->dump;
-  
+
   $resp->content_type('application/json');
   $resp->content($json);
 
@@ -1152,16 +1152,16 @@ sub h_list {
     Input => $cfg->{Networks},
   );
   my $json = $jsify->dump;
-  
+
   $resp->content_type('application/json');
   $resp->content($json);
-  
+
   $resp->respond;
 
   my $conn = $req->connection;
   my $addr = $conn->remote_host;
   log_to('http', 'info', "$addr 200 h_list");
-  
+
   $resp->done;
 }
 
@@ -1205,20 +1205,20 @@ sub h_network {
     }
     $kernel->yield( h_server => $req, $resp, $network, $server );
     return
-  }    
+  }
 
   ## otherwise, try to serve a net hash:
 
   if ($uri->query && $uri->query =~ /^gzip/i) {
     $resp->content_type('application/x-gzip');
     $resp->content($zipped);
-  } else {  
+  } else {
     my $json = memGunzip($zipped);
     undef $zipped;
     $resp->content_type('application/json');
     $resp->content($json);
   }
-  
+
   $resp->respond;
 
   my $conn = $req->connection;
@@ -1243,19 +1243,19 @@ sub js_push_pending {
     $kernel->alarm_add('js_push_pending', Time::HiRes::time + 0.5, $item);
     return
   }
-  
+
   ## otherwise fork worker and put()
   my ($network) = @$item;
-  
+
   log_to('session', 'debug', "Encoder spawn: $network");
-  
+
   ## borrowed from PoCo Resolver:
   my $perlpath = $Config{perlpath};
   if ($^O ne 'VMS') {
     $perlpath .= $Config{_exe}
       unless $perlpath =~ m/$Config{_exe}$/i;
   }
-  
+
   my $forkable;
   if ($^O eq 'MSWin32') {
     ## sucks to be you!
@@ -1268,7 +1268,7 @@ sub js_push_pending {
       'IRC::Indexer::Process::JSONify->worker()'
     ];
   }
-  
+
   my $wheel = POE::Wheel::Run->new(
     Program => $forkable,
     ErrorEvent  => 'js_worker_error',
@@ -1279,12 +1279,12 @@ sub js_push_pending {
   );
 
   ++$state->{stats}->{EncoderWheels}->{Created};
-  
+
   my $wheelid = $wheel->ID;
   my $pidof   = $wheel->PID;
-  
+
   $kernel->sig_child($pidof, 'js_worker_sigchld');
-  
+
   $obj->{workers_by_pid}->{$pidof}   = $wheel;
   $obj->{workers_by_wid}->{$wheelid} = $wheel;
 
@@ -1296,14 +1296,14 @@ sub js_worker_stdout {
   my ($kernel, $item) = @_[KERNEL, ARG0];
 
   log_to('session', 'debug', "Handling input from encoder");
-  
+
   my ($zip, $network, $server) = splice @$item, 0, 4;
   unless ($network) {
     log_to('session', 'warn', "Invalid input from encoder!");
     ++$state->{stats}->{EncoderWheels}->{BadResult};
     return
   }
-  
+
   ++$state->{stats}->{EncoderWheels}->{Success};
 
   ## got JSON back, cache_json it unless it's stale
@@ -1320,15 +1320,15 @@ sub js_worker_stdout {
 sub js_worker_stderr {
   my ($kernel, $err, $id) = @_[KERNEL, ARG0, ARG1];
   log_to('session', 'warn', "Encoder reported err: $err");
-  
+
   ++$state->{stats}->{EncoderWheels}->{Died};
   ## these will die() and go away.
 }
 
 sub js_worker_closed {
-  my ($kernel, $wheelid) = @_[KERNEL, ARG0];  
+  my ($kernel, $wheelid) = @_[KERNEL, ARG0];
   my $wheel = delete $obj->{workers_by_wid}->{$wheelid};
-  
+
   if (defined $wheel) {
     ++$state->{stats}->{EncoderWheels}->{Closed};
     my $pidof = $wheel->PID;
@@ -1345,14 +1345,14 @@ sub js_worker_error {
 sub js_worker_sigchld {
   ## child's gone
   my ($kernel, $pidof) = @_[KERNEL, ARG1];
-  
+
   log_to('session', 'debug', "Worker sig_chld: $pidof");
 
   ++$state->{stats}->{EncoderWheels}->{SIGCHLD};
 
   my $wheel;
   return unless $wheel = delete $obj->{workers_by_pid}->{$pidof};
-  
+
   my $wheelid = $wheel->ID;
   delete $obj->{workers_by_wid}->{$wheelid};
 }
@@ -1360,7 +1360,7 @@ sub js_worker_sigchld {
 sub start_indexer {
   if ($opts->{detach}) {
     print "Starting detached indexer.\n";
-    
+
     my $fork = fork;
     exit 1 if not defined $fork;
     exit 0 if $fork;
@@ -1406,44 +1406,44 @@ ircindexer-server-json - Serve IRC::Indexer JSON over HTTP
 
 =head1 DESCRIPTION
 
-Indexes sets of servers in parallel via L<IRC::Indexer>, exporting 
+Indexes sets of servers in parallel via L<IRC::Indexer>, exporting
 information as JSON via HTTP for ease of retrieval.
 
 Uses L<POEx::HTTP::Server> to provide HTTP daemon functionality.
 
 JSON is encoded by forked L<IRC::Indexer::Process::JSONify> instances.
 
-Intended to serve as the back-end to a presentation system for the 
-data collected. See L<IRC::Indexer::POD::ExampleClients> for some 
+Intended to serve as the back-end to a presentation system for the
+data collected. See L<IRC::Indexer::POD::ExampleClients> for some
 examples of ways to make use of the exported data on the client side.
 
 =head2 Fetching JSON
 
-Networks or servers that are configured but not yet trawled will report 
+Networks or servers that are configured but not yet trawled will report
 a 404 error with a string indicating that the trawl run is pending.
 
 You can check 404s for network/server requests for status information.
 
-If the first word of the 404 content is PENDING, the requested item is 
+If the first word of the 404 content is PENDING, the requested item is
 pending a trawler run.
 
-If the first word of the 404 content is NO_SUCH, the requested item is 
+If the first word of the 404 content is NO_SUCH, the requested item is
 not being indexed by the trawler.
 
 =head3 List
 
-A hash containing networks and servers scheduled for trawling is 
+A hash containing networks and servers scheduled for trawling is
 available via B</list>:
 
   ## JSON hash containing network -> server mapping of
   ## configured trawlers:
   http://my.server:8700/list
 
-Note that this is the list of configured network -> server maps, not 
+Note that this is the list of configured network -> server maps, not
 necessarily the list of B<trawled> servers.
 
-That is to say, the network names are guaranteed valid, but the server 
-names may not be available under the /network/<NET>/server/ tree; for a 
+That is to say, the network names are guaranteed valid, but the server
+names may not be available under the /network/<NET>/server/ tree; for a
 list of servers available for retrieval, see L</Servers>, below.
 
 =head3 Networks
@@ -1455,7 +1455,7 @@ Network information hashes are exported via B</network/> routes:
 
   ## JSON Network Info hash for 'CobaltIRC':
   http://my.server:8700/network/CobaltIRC
-  
+
   ## Compressed:
   http://my.server:8700/network/CobaltIRC?gzip
 
@@ -1463,7 +1463,7 @@ These are indexed by their configured network name.
 
 =head3 Servers
 
-Specific server hashes as described in L<IRC::Indexer::Trawl::Bot> are 
+Specific server hashes as described in L<IRC::Indexer::Trawl::Bot> are
 exported via /network/<NETNAME>/server/<SERVERNAME>:
 
   ## List of trawled servers for this network:
@@ -1471,15 +1471,15 @@ exported via /network/<NETNAME>/server/<SERVERNAME>:
 
   ## Trawl results from a single server:
   http://my.server:8700/network/CobaltIRC/server/eris.oppresses.us
-  
+
   ## Compressed:
   http://my.server:8700/network/CobaltIRC/server/eris.oppresses.us?gzip
 
-Note that servers are not available for retrieval until they are 
-trawled; depending on trawl intervals, it may take some time to cycle 
+Note that servers are not available for retrieval until they are
+trawled; depending on trawl intervals, it may take some time to cycle
 through all listed servers for a network.
 
-Also note that servers are indexed by their reported server name -- not 
+Also note that servers are indexed by their reported server name -- not
 necessarily the name specified in their configuration.
 
 =head3 Stats
@@ -1491,12 +1491,12 @@ Stats regarding the running instance are exported via B</stats>:
 
 =head2 Reloading networks
 
-You can reload the existing networks set and force a rehash by sending a 
+You can reload the existing networks set and force a rehash by sending a
 SIGHUP to the server.
 
-Your NetworkDir will be re-scanned and any removed networks will be 
-pulled from the trawl cache. All networks will have their trawl runs 
-rescheduled immediately -- in other words, SIGHUP can also be used to 
+Your NetworkDir will be re-scanned and any removed networks will be
+pulled from the trawl cache. All networks will have their trawl runs
+rescheduled immediately -- in other words, SIGHUP can also be used to
 force a refresh.
 
 =head1 AUTHOR

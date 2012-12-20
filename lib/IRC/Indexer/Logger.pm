@@ -1,8 +1,7 @@
 package IRC::Indexer::Logger;
 
 use 5.10.1;
-use strict;
-use warnings;
+use strictures 1;
 use Carp;
 
 use Scalar::Util qw/blessed/;
@@ -14,7 +13,7 @@ sub new {
   my $class = shift;
   bless $self, $class;
   ## Set up a Log::Handler for specified LogFile
-  
+
   my %args = @_;
   $args{lc $_} = delete $args{$_} for keys %args;
 
@@ -22,14 +21,14 @@ sub new {
     ## Sometimes it's useful to have a log object present,
     ## but not necessarily logging anywhere:
     $self->{DevNull} = 1;
-  } else { 
+  } else {
     $self->{LogFile} = $args{logfile}
       || croak "No LogFile specified in new()";
-  }  
+  }
   $self->{LogLevel} = $args{loglevel} || 'info' ;
-  
+
   $self->logger( $self->_create_logger );
-  
+
   return $self
 }
 
@@ -41,7 +40,7 @@ sub _create_logger {
       maxlevel => $self->{LogLevel},
       timeformat => "%Y/%m/%d %H:%M:%S",
       message_layout => "[%T] %L %p %m",
-      
+
       filename => $self->{LogFile},
       filelock => 1,
       fileopen => 1,
@@ -50,7 +49,7 @@ sub _create_logger {
       autoflush => 1,
     },
   ) unless $self->{DevNull};
- 
+
   return $logger
 }
 
@@ -87,7 +86,7 @@ IRC::Indexer::Logger - Simple interface to Log::Handler
 
     ## Typically 'debug', 'info', 'warn':
     LogLevel => 'info',
-    
+
     ## Enable DevNull to set up loggers yourself later
     ## (Useful for only logging to STDOUT for example)
     DevNull => 0,
@@ -95,21 +94,21 @@ IRC::Indexer::Logger - Simple interface to Log::Handler
 
   ## Switch to a different file:
   $handler->log_to($new_logfile);
-  
+
   ## Access the actual logger:
   my $logger = $handler->logger;
-  
+
   ## Log things:
   $logger->info("Something informative");
   $logger->warn("Something went wrong!");
   $logger->debug("Things are happening.");
-  
+
 =head1 DESCRIPTION
 
-Simplified construction of Log::Handler instances for IRC::Indexer 
+Simplified construction of Log::Handler instances for IRC::Indexer
 frontends.
 
-See the SYNOPSIS for usage details and L<Log::Handler> for more 
+See the SYNOPSIS for usage details and L<Log::Handler> for more
 about using the log object itself.
 
 =head1 AUTHOR
