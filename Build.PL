@@ -37,6 +37,9 @@ my $build = Module::Build->new(
     'File::Spec' => 0,
     
     'Time::HiRes' => 0,
+
+    'Moo'         => 1,
+    'strictures'  => 1,
     
    ## Logging
     'Log::Handler' => 0,

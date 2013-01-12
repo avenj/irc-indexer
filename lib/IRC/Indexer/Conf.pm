@@ -1,17 +1,15 @@
 package IRC::Indexer::Conf;
 
 use 5.10.1;
-use strict;
-use warnings;
+use strictures 1;
 use Carp;
 
-use Scalar::Util qw/openhandle/;
-
+use Scalar::Util 'openhandle';
 use File::Find;
-
 use YAML::XS ();
 
-sub new { bless {}, shift }
+## No real reason to construct, but sure, why not:
+sub new { bless \(my $s = 1), shift }
 
 sub slurp {
   my ($self, $path) = @_;

@@ -1,12 +1,10 @@
 package IRC::Indexer::Trawl::Bot;
 
 use 5.10.1;
-use strict;
-use warnings;
+use strictures 1;
 use Carp;
 
 use IRC::Indexer;
-
 use IRC::Indexer::Report::Server;
 
 use POE;
