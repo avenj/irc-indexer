@@ -1,0 +1,3 @@
+- keep Trawlers and Reports, maybe with minor rework (interface roles?)
+- write Emitter layer that can manage any kind of trawler set
+- write HTTP and ZMQ listeners
