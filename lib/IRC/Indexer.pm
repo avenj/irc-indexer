@@ -1,6 +1,19 @@
 package IRC::Indexer;
-our $VERSION = '0.07_01';
+use strictures 1;
+use Carp;
 
+sub import {
+  my ($self, @modules) = @_;
+  my $pkg = caller;
+  my @failed;
+  for my $mod (@modules) {
+    my $c = "package $pkg; use IRC::Indexer::$mod;";
+    eval $c;
+    if ($@) { carp $@; push @failed, @mod }
+  }
+  confess "Failed to import ".join ' ', @failed if @failed;
+  1
+}
 ## stub! for now ..
 
 1;

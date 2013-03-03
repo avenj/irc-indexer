@@ -15,3 +15,11 @@ Trawlers
 
 Frontends
   - HTTP
+
+Logging
+  - Kill Log::Handler in favor of faster logger
+
+DB
+  - Add SQL options?
+  - Add DB_File / flatfile persistency and querying?
+    needs to be accessible via misc frontends (zmq, http etc)
