@@ -51,7 +51,10 @@ my $build = Module::Build->new(
     'IRC::Utils' => '0.11',
     'POE::Component::IRC' => '6.74',
 
-   ## HTTP
+   ## Transports
+    # ZMQ
+    'POEx::ZMQ3' => '0.03',
+    # HTTP
     'URI' => 0,
     'POEx::HTTP::Server' => 0,    
    

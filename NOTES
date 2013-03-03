@@ -1,3 +1,17 @@
 - keep Trawlers and Reports, maybe with minor rework (interface roles?)
 - write Emitter layer that can manage any kind of trawler set
 - write HTTP and ZMQ listeners
+
+Masters
+  - Fork Trawlers, optionally keepalive Trawlers
+  - Speak ZMQ+JSON to Trawlers
+  - Generate Reports
+    Reports can stay as-is, probably
+    Optional 'publish when generated' 
+
+Trawlers
+  - Slimmed-down IRC transport?
+  - Speak ZMQ+JSON to Masters
+
+Frontends
+  - HTTP
