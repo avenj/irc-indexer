@@ -1,0 +1,26 @@
+- keep Trawlers and Reports, maybe with minor rework (interface roles?)
+- write Emitter layer that can manage any kind of trawler set
+- write HTTP and ZMQ listeners
+
+Masters
+  - Fork Trawlers, optionally keepalive Trawlers
+  - Speak ZMQ+JSON to Trawlers
+  - Generate Reports
+    Reports can stay as-is, probably
+    Optional 'publish when generated' 
+
+Trawlers
+  - Slimmed-down IRC transport?
+    Can either use Backend directly or Client::Lite
+  - Speak ZMQ+JSON to Masters
+
+Frontends
+  - HTTP
+
+Logging
+  - Kill Log::Handler in favor of faster logger
+
+DB
+  - Add SQL options?
+  - Add DB_File / flatfile persistency and querying?
+    needs to be accessible via misc frontends (zmq, http etc)
