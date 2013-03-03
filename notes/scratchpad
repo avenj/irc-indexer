@@ -11,6 +11,7 @@ Masters
 
 Trawlers
   - Slimmed-down IRC transport?
+    Can either use Backend directly or Client::Lite
   - Speak ZMQ+JSON to Masters
 
 Frontends
