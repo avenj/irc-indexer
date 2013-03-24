@@ -1,5 +1,5 @@
 
-### COMPONENTS
+#### COMPONENTS
 
 * Trawlers trawl assigned servers and report results upstream
   to Controllers via IPC
@@ -13,26 +13,27 @@
 * Masters manage arbitrary numbers of controllers via ZMQ+JSON
   Provide bridge to arbitrary DBs and querying capability
 
-### COMMAND SPEC
+#### COMMAND SPEC
 
-## Query(Any) --> Master
-# PING
-# GET
-# SEARCH
-## Master --> Controller
+### Query(Any) --> Master
+## PING
+## GET
+## SEARCH
+## STATUS
+### Master --> Controller
 # PING
 # STATUS
 # ASSIGN
 # CANCEL
 # STOP
-## Master <-- Controller
+### Master <-- Controller
 # PING
 # RESULT
 # ERR
-## Controller --> Trawler
+### Controller --> Trawler
 # TRAWL
 # STOP
-## Controller <-- Trawler
+### Controller <-- Trawler
 # RESULT
 # ERR
 
