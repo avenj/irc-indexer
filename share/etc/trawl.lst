@@ -1,0 +1,14 @@
+{
+  "CobaltIRC": {
+    "servers": [
+      "eris.oppresses.us",
+      [ 
+        "raider.blackcobalt.net",
+        {
+          "port": 6667
+        }
+      ],
+      "menthe.oppresses.us"
+    ]
+  }
+}
