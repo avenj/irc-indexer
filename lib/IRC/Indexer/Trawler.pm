@@ -1,5 +1,9 @@
 package IRC::Indexer::Trawler;
 
+# FIXME turn me into a bot mgr ->
+#   fork bot processes & manage via POE::Wheel
+#   DEALER to talk to Dispatcher's ROUTER
+
 use POE;
 use POEx::IRC::Client::Lite;
 
