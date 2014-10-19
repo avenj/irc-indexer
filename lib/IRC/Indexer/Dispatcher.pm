@@ -3,6 +3,9 @@ package IRC::Indexer::Dispatcher;
 # FIXME
 #   provide ROUTER to talk to clients (REQ), trawlers (DEALER)
 #   handle responding to PINGs
+#   handle LOG messages
+#     log to configured file, if any
+#     if configured to do so, also send logs to PUB
 #   handle adding trawlers sending HELLO to seen hash
 #   handle sending PINGs to previously-seen trawlers
 #    & removing unresponsive trawlers from seen hash
@@ -10,10 +13,10 @@ package IRC::Indexer::Dispatcher;
 #    to another trawler if available or queuing up and notifying client
 #    of WAITING status
 #   dispatch work to trawlers when client sends BATCH
-#   -> client should be able to rr to multiple dispatchers,
-#      remove a dispatcher and retry if multiples avail and request times out
-#       (otherwise die)
-#     client can disconnect after sending BATCH, results published later,
+#   -> client should be able to send to another dispatcher if no 'COMPLETE'
+#      command received from dispatcher after X secs
+#   -> client should be allowed to disconnect any time, clients aren't
+#      required to retrieve results
 #     client can optionally SUB to Dispatcher's PUB for result retrieval
 #    -> trawler forks bot, builds a report to serialize and send back
 #       via its DEALER -> Dispatcher's ROUTER
@@ -53,7 +56,7 @@ has zmq_context => (
 );
 
 
-has _known_peers => (
+has _known_trawlers => (
   lazy      => 1,
   is        => 'ro',
   isa       => HashObj,
@@ -70,35 +73,19 @@ has _sock_rtr_clients => (
   builder   => sub {
     my ($self) = @_;
     POEx::ZMQ->socket(
-      event_prefix => 'zmq_local_',
+      event_prefix => 'zmq_rtr_',
       context => $self->zmq_context,
       type    => ZMQ_ROUTER,
     )
   },
 );
 
-has _sock_rtr_peers => (
-  lazy      => 1,
-  is        => 'ro',
-  isa       => ZMQSocket[ZMQ_ROUTER],
-  clearer   => '_clear_sock_rtr_peers',
-  predicate => '_has_sock_rtr_peers',
-  builder   => sub {
-    my ($self) = @_;
-    POEx::ZMQ->socket(
-      event_prefix => 'zmq_remote_',
-      context => $self->zmq_context,
-      type    => ZMQ_ROUTER,
-    )
-  },
-);
-
-has _sock_pub_state => (
+has _sock_pub_result => (
   lazy      => 1,
   is        => 'ro',
   isa       => ZMQSocket[ZMQ_PUB],
-  clearer   => '_clear_sock_pub_state',
-  predicate => '_has_sock_pub_state',
+  clearer   => '_clear_sock_pub_result',
+  predicate => '_has_sock_pub_result',
   builder   => sub {
     my ($self) = @_;
     POEx::ZMQ->socket(
@@ -108,29 +95,11 @@ has _sock_pub_state => (
   },
 );
 
-has _sock_sub_state => (
-  lazy      => 1,
-  is        => 'ro',
-  isa       => ZMQSocket[ZMQ_SUB],
-  clearer   => '_clear_sock_sub_state',
-  predicate => '_has_sock_sub_state',
-  builder   => sub {
-    my ($self) = @_;
-    POEx::ZMQ->socket(
-      event_prefix => 'zmq_state_',
-      context => $self->zmq_context,
-      type    => ZMQ_SUB,
-    )
-  },
-);
-
 sub _clear_all_sockets {
   my ($self) = @_;
   $self->_clear_sock_rtr_clients if $self->_has_sock_rtr_clients;
-  $self->_clear_sock_rtr_peers   if $self->_has_sock_rtr_peers;
-  $self->_clear_sock_pub_state   if $self->_has_sock_pub_state;
-  $self->_clear_sock_sub_state   if $self->_has_sock_sub_state;
-  $self->_known_peers->clear;
+  $self->_clear_sock_pub_result  if $self->_has_sock_pub_result;
+  $self->_known_trawlers->clear;
 }
 
 
@@ -142,9 +111,7 @@ sub start {
       emitter_started => '_emitter_started',
       emitter_stopped => '_emitter_stopped',
 
-      zmq_state_recv            => '_zmq_state_recv',
-      zmq_local_recv_multipart  => '_zmq_local_recv_multipart',
-      zmq_remote_recv_multipart => '_zmq_remote_recv_multipart',
+      zmq_rtr_recv_multipart  => '_zmq_rtr_recv_multipart',
     },
   ]);
 
@@ -172,6 +139,7 @@ sub _emitter_stopped {
 
 
 sub _zmq_state_recv {
+  # FIXME deprecated
   # Peer announcing state to us.
   my ($kernel, $self, $msg) = @_[KERNEL, OBJECT, ARG0];
   
@@ -190,7 +158,7 @@ sub _zmq_state_recv {
   #   manage it via heartbeating
 }
 
-sub _zmq_local_recv_multipart {
+sub _zmq_rtr_recv_multipart {
   # FIXME command input from local DEALER clients
   #  dispatcher for commands
 }
@@ -201,3 +169,54 @@ sub _zmq_remote_recv_multipart {
 }
 
 1;
+
+=pod
+
+=head2 ZEROMQ COMMAND SET
+
+=head3 Message framing
+
+Commands received on the Dispatcher's C<server> (ROUTER) socket are sent as
+multi-part messages in which a command name as specified below is followed by
+a C<JSON> string.
+
+=head3 BATCH
+
+  BATCH <JSON>
+    <JSON> = HASH = +{
+      servers => +{ 
+        $serv => $network_name,
+        ...
+      },
+      opts    => +{
+        timeout => $seconds,
+      },
+    };
+
+Sent by L<IRC::Indexer::Client> instances to initiate a trawl.
+
+=head3 HELLO
+
+  HELLO
+
+Sent by L<IRC::Indexer::Trawler> instances after a connection is established.
+
+=head3 LOG
+
+  LOG <JSON>
+    <JSON> = HASH = {
+      level => 'warn',  # or 'info'
+      msg   => $string,
+    };
+
+Sent by L<IRC::Indexer::Client> or L<IRC::Indexer::Trawler> instances to
+register new log messages.
+
+=head3 PING
+
+  PING <VALUE>
+
+Sent by any type of connecting client to determine connectivity; a C<PONG>
+containing the same arbitrary value is returned.
+
+=cut

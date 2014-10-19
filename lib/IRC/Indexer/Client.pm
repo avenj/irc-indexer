@@ -20,16 +20,33 @@ has '+shutdown_signal'  => ( default => sub { 'SHUTDOWN_IRCINDEX_CLIENT' } );
 has '+register_prefix'  => ( default => sub { 'IrcIndexer' } );
 
 
-has server_endpoint => (
-  required  => 1,
+has dispatcher_endpoint => (
+  lazy      => 1,
   is        => 'ro',
-  isa       => Str,
+  isa       => Maybe[ZMQEndpoint],
+  builder   => sub { undef },
 );
 
-has trawl_list => (
-  required  => 1,
+has dispatcher_timeout => (
+  lazy      => 1,
   is        => 'ro',
-  isa       => InstanceOf['IRC::Indexer::Conf::TrawlList'],
+  isa       => StrictNum,
+  builder   => sub { 180 },
+);
+
+
+has collector_endpoint => (
+  lazy      => 1,
+  is        => 'ro',
+  isa       => Maybe[ZMQEndpoint],
+  builder   => sub { undef },
+);
+
+has collector_timeout => (
+  lazy      => 1,
+  is        => 'ro',
+  isa       => StrictNum,
+  builder   => sub { 180 },
 );
 
 
@@ -40,19 +57,33 @@ has zmq_context => (
   builder   => sub { POEx::ZMQ->context },
 );
 
-has _zmq_sock => (
+has _zmq_sock_dispatcher => (
   lazy      => 1,
   is        => 'ro',
   isa       => ZMQSocket[ZMQ_DEALER],
-  clearer   => '_clear_zmq_sock',
+  writer    => '_set_zmq_sock_dispatcher',
   builder   => sub {
     POEx::ZMQ->socket(
-      context => shift->zmq_context,
-      type    => ZMQ_DEALER
+      event_prefix  => 'dispatcher_',
+      context       => shift->zmq_context,
+      type          => ZMQ_DEALER
     )
   },
 );
 
+has _zmq_sock_collector => (
+  lazy      => 1,
+  is        => 'ro',
+  isa       => ZMQSocket[ZMQ_DEALER],
+  writer    => '_set_zmq_sock_collector',
+  builder   => sub {
+    POEx::ZMQ->socket(
+      event_prefix  => 'collector_',
+      context       => shift->zmq_context,
+      type          => ZMQ_DEALER
+    )
+  },
+);
 
 sub start {
   my ($self) = @_;
@@ -62,10 +93,42 @@ sub start {
       emitter_started => '_emitter_started',
       emitter_stopped => '_emitter_stopped',
 
-      zmq_recv => '_zmq_recv',
+      dispatcher_recv_multi => '_zmq_dispatcher_recv',
+
+      collector_recv_multi  => '_zmq_collector_recv',
     },
   ]);
 }
+
+sub start_trawl {
+  my ($self, $list) = @_;
+  # FIXME
+  #   Trawl list as iterable obj?
+  #   Die if no dispatcher configured
+  #   Start ping/pong dialog with dispatcher
+  #     + accompanying timeout tracking
+  #   Send serialized (JSON::MaybeXS?) trawl list
+}
+
+
+sub find_results {
+  my ($self, $netname_pattern, $servname_pattern) = @_;
+  # FIXME ask Collector to look for strings (or glob-y patterns?)
+  #   in $netname_pattern or $servname_pattern
+}
+
+sub get_results {
+  my ($self, $netname) = @_;
+  # FIXME ask Collector for results for $netname
+  #   or all available
+}
+
+sub get_netnames {
+  my ($self, $netname_pattern) = @_;
+  # FIXME ask Collector for all available netnames
+  #   or matching $netname_pattern
+}
+
 
 sub _emitter_started {
   # FIXME socket setup / connect
@@ -74,7 +137,15 @@ sub _emitter_started {
 
 sub _emitter_stopped {
   my ($self) = @_;
-  $self->_clear_zmq_sock;
+  # FIXME shutdown cleanups?
+}
+
+sub _zmq_dispatcher_recv {
+  # FIXME command dispatch
+}
+
+sub _zmq_collector_recv {
+  # FIXME command dispatch
 }
 
 1;

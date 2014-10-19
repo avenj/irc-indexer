@@ -1,0 +1,11 @@
+#!/usr/bin/env perl
+
+# FIXME
+#   load cfg to Conf obj
+#   handle spawning appropriate classes from here based on
+#    cmd line opts
+#     default to --client
+#     allow --dispatcher|server, --collector
+#     (all exclusive? or allow single-proc?)
+#   handle starting appropriate component
+#   handle daemonization
