@@ -33,6 +33,7 @@ has dispatcher_endpoints => (
   is        => 'ro',
   isa       => TypedArray[ZMQEndpoint],
   predicate => 'has_dispatcher_endpoints',
+  coerce    => 1,
   builder   => sub { [] },
 );
 
