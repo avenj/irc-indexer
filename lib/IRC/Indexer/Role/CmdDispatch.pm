@@ -13,12 +13,11 @@ requires 'serialize', 'deserialize';
 
 
 sub dispatch_and_reply {
-  my $self = shift;
-  if ( my $rv = $self->dispatch(@_) ) {
-    my (undef, $parts, $sender) = @_;
+  my ($self, $type, $parts, $sender) = @_;
+  if ( my $rv = $self->dispatch_cmd($type, $parts, $sender) ) {
     my (undef, $routes) = $parts->tail;
     $poe_kernel->post( $sender => send_multipart =>
-      $routes->all, $self->serialize($rv)
+      [ $routes->all, $self->serialize($rv) ]
     );
   }
    
